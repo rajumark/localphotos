@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">LocalPhotos</string>
+    <string name="search_photos">Search photos by text…</string>
+    <string name="all">All</string>
+    <string name="with_text">With text</string>
+    <string name="favorites">Favorites</string>
+    <string name="photos">Photos</string>
+    <string name="no_photos_found">No photos found</string>
+    <string name="pending_ocr">%d pending</string>
+    <string name="extracted_text">Extracted text</string>
+    <string name="share">Share</string>
+    <string name="delete">Delete</string>
+    <string name="add_to_favorites">Add to favorites</string>
+    <string name="remove_from_favorites">Remove from favorites</string>
+    <string name="delete_confirmation">Delete this photo?</string>
+    <string name="cancel">Cancel</string>
+    <string name="confirm">Confirm</string>
+    <string name="no_images_found">No images found on device</string>
+    <string name="permission_denied">Storage permission needed to scan photos</string>
+</resources>

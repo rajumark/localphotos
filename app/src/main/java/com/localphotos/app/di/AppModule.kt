@@ -1,0 +1,40 @@
+package com.localphotos.app.di
+
+import androidx.room.Room
+import com.localphotos.app.data.local.AppDatabase
+import com.localphotos.app.data.local.PhotoDao
+import com.localphotos.app.data.repository.PhotoRepository
+import com.localphotos.app.data.repository.PhotoRepositoryImpl
+import com.localphotos.app.ocr.OCRProcessor
+import com.localphotos.app.ui.detail.DetailViewModel
+import com.localphotos.app.ui.favorites.FavoritesViewModel
+import com.localphotos.app.ui.main.MainViewModel
+import org.koin.android.ext.koin.androidContext
+import org.koin.androidx.viewmodel.dsl.viewModel
+import org.koin.dsl.module
+
+val appModule = module {
+    single {
+        Room.databaseBuilder(
+            androidContext(),
+            AppDatabase::class.java,
+            "localphotos.db"
+        ).fallbackToDestructiveMigration().build()
+    }
+
+    single<PhotoDao> { get<AppDatabase>().photoDao() }
+
+    single { OCRProcessor(androidContext()) }
+
+    single<PhotoRepository> {
+        PhotoRepositoryImpl(
+            context = androidContext(),
+            photoDao = get(),
+            ocrProcessor = get()
+        ) as PhotoRepository
+    }
+
+    viewModel { MainViewModel(get()) }
+    viewModel { DetailViewModel(get()) }
+    viewModel { FavoritesViewModel(get()) }
+}
