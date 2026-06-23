@@ -1,10 +1,14 @@
 package com.localphotos.app.data.local
 
+import androidx.paging.PagingSource
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.RawQuery
 import androidx.room.Update
+import androidx.sqlite.db.SimpleSQLiteQuery
+import androidx.sqlite.db.SupportSQLiteQuery
 import com.localphotos.app.data.local.entities.PhotoEntity
 import com.localphotos.app.data.local.entities.PhotoFtsEntity
 import kotlinx.coroutines.flow.Flow
@@ -37,22 +41,16 @@ interface PhotoDao {
     suspend fun deleteFtsNotIn(uris: List<String>)
 
     @Query("SELECT * FROM photos ORDER BY dateAdded DESC")
-    fun getAllPhotos(): Flow<List<PhotoEntity>>
-
-    @Query("SELECT * FROM photos WHERE text != '' ORDER BY dateAdded DESC")
-    fun getPhotosWithText(): Flow<List<PhotoEntity>>
-
-    @Query("SELECT * FROM photos WHERE uri IN (SELECT uri FROM photos_fts WHERE photos_fts.text MATCH :query) ORDER BY dateAdded DESC")
-    fun searchPhotos(query: String): Flow<List<PhotoEntity>>
-
-    @Query("SELECT * FROM photos WHERE text != '' AND uri IN (SELECT uri FROM photos_fts WHERE photos_fts.text MATCH :query) ORDER BY dateAdded DESC")
-    fun searchPhotosWithText(query: String): Flow<List<PhotoEntity>>
+    fun getAllPhotosPaged(): PagingSource<Int, PhotoEntity>
 
     @Query("SELECT * FROM photos WHERE isFavorite = 1 ORDER BY dateAdded DESC")
-    fun getFavoritePhotos(): Flow<List<PhotoEntity>>
+    fun getFavoritePhotosPaged(): PagingSource<Int, PhotoEntity>
 
-    @Query("SELECT * FROM photos WHERE isFavorite = 1 AND uri IN (SELECT uri FROM photos_fts WHERE photos_fts.text MATCH :query) ORDER BY dateAdded DESC")
-    fun searchFavoritePhotos(query: String): Flow<List<PhotoEntity>>
+    @Query("SELECT * FROM photos WHERE text != '' ORDER BY dateAdded DESC")
+    fun getPhotosWithTextPaged(): PagingSource<Int, PhotoEntity>
+
+    @RawQuery(observedEntities = [PhotoEntity::class])
+    fun searchPhotosPaged(query: SupportSQLiteQuery): PagingSource<Int, PhotoEntity>
 
     @Query("SELECT COUNT(*) FROM photos WHERE isFavorite = 1")
     fun getFavoriteCount(): Flow<Int>
@@ -74,4 +72,37 @@ interface PhotoDao {
 
     @Query("UPDATE photos SET isTextProcessed = 1, text = :text WHERE uri = :uri")
     suspend fun markProcessed(uri: String, text: String)
+
+    companion object {
+        fun createSearchQuery(
+            searchText: String,
+            filterTextOnly: Boolean,
+            favoritesOnly: Boolean = false
+        ): SupportSQLiteQuery {
+            val conditions = mutableListOf<String>()
+            if (favoritesOnly) {
+                conditions.add("photos.isFavorite = 1")
+            }
+            if (searchText.isNotBlank()) {
+                val parts = searchText.trim().split(Regex("\\s+"))
+                val ftsTerms = parts.joinToString(" ") { "${it}*" }
+                val escaped = ftsTerms.replace("'", "''")
+                conditions.add(
+                    "photos.uri IN (SELECT uri FROM photos_fts WHERE photos_fts.text MATCH '$escaped')"
+                )
+            }
+            if (filterTextOnly) {
+                conditions.add("photos.text != ''")
+            }
+            val whereClause = if (conditions.isNotEmpty()) {
+                "WHERE ${conditions.joinToString(" AND ")}"
+            } else ""
+            val sql = """
+                SELECT photos.* FROM photos
+                $whereClause
+                ORDER BY photos.dateAdded DESC
+            """.trimIndent()
+            return SimpleSQLiteQuery(sql)
+        }
+    }
 }

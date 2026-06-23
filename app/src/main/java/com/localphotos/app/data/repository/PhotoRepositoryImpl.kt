@@ -3,13 +3,23 @@ package com.localphotos.app.data.repository
 import android.content.Context
 import android.net.Uri
 import android.provider.MediaStore
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
+import androidx.paging.PagingData
+import androidx.paging.PagingSource
+import androidx.paging.PagingState
+import androidx.paging.insertSeparators
+import androidx.paging.map
 import com.localphotos.app.data.local.PhotoDao
 import com.localphotos.app.data.local.entities.PhotoEntity
 import com.localphotos.app.data.local.entities.PhotoFtsEntity
+import com.localphotos.app.data.local.entities.PhotoListItem
 import com.localphotos.app.ocr.OCRProcessor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import java.util.Calendar
 
 class PhotoRepositoryImpl(
     private val context: Context,
@@ -17,27 +27,51 @@ class PhotoRepositoryImpl(
     private val ocrProcessor: OCRProcessor
 ) : PhotoRepository {
 
-    override fun getAllPhotos(
+    override fun getAllPhotosPaged(
         searchText: String,
         filterTextOnly: Boolean
-    ): Flow<List<PhotoEntity>> {
-        return when {
-            searchText.isNotBlank() && filterTextOnly ->
-                photoDao.searchPhotosWithText(buildFtsQuery(searchText))
-            searchText.isNotBlank() ->
-                photoDao.searchPhotos(buildFtsQuery(searchText))
-            filterTextOnly ->
-                photoDao.getPhotosWithText()
-            else ->
-                photoDao.getAllPhotos()
+    ): Flow<PagingData<PhotoListItem>> {
+        return createPager(searchText, filterTextOnly, false).flow.map { pagingData ->
+            pagingData
+                .map<PhotoEntity, PhotoListItem> { PhotoListItem.Photo(it) }
+                .insertSeparators { before, after ->
+                    val beforeDate = (before as? PhotoListItem.Photo)?.entity?.dateAdded
+                    val afterDate = (after as? PhotoListItem.Photo)?.entity?.dateAdded
+                    when {
+                        before == null && afterDate != null -> PhotoListItem.Header(getSectionLabel(afterDate))
+                        after == null -> null
+                        beforeDate != null && afterDate != null && getSectionLabel(beforeDate) != getSectionLabel(afterDate) ->
+                            PhotoListItem.Header(getSectionLabel(afterDate))
+                        else -> null
+                    }
+                }
         }
     }
 
-    override fun getFavoritePhotos(searchText: String): Flow<List<PhotoEntity>> {
-        return if (searchText.isNotBlank()) {
-            photoDao.searchFavoritePhotos(buildFtsQuery(searchText))
-        } else {
-            photoDao.getFavoritePhotos()
+    override fun getFavoritePhotosPaged(searchText: String): Flow<PagingData<PhotoListItem>> {
+        return Pager(
+            config = PagingConfig(pageSize = 30, initialLoadSize = 90, enablePlaceholders = false),
+            pagingSourceFactory = {
+                if (searchText.isNotBlank()) {
+                    SearchPagingSource(searchText, false, true, photoDao)
+                } else {
+                    photoDao.getFavoritePhotosPaged()
+                }
+            }
+        ).flow.map { pagingData ->
+            pagingData
+                .map<PhotoEntity, PhotoListItem> { PhotoListItem.Photo(it) }
+                .insertSeparators { before, after ->
+                    val beforeDate = (before as? PhotoListItem.Photo)?.entity?.dateAdded
+                    val afterDate = (after as? PhotoListItem.Photo)?.entity?.dateAdded
+                    when {
+                        before == null && afterDate != null -> PhotoListItem.Header(getSectionLabel(afterDate))
+                        after == null -> null
+                        beforeDate != null && afterDate != null && getSectionLabel(beforeDate) != getSectionLabel(afterDate) ->
+                            PhotoListItem.Header(getSectionLabel(afterDate))
+                        else -> null
+                    }
+                }
         }
     }
 
@@ -57,20 +91,22 @@ class PhotoRepositoryImpl(
     }
 
     override suspend fun refreshPhotos() = withContext(Dispatchers.IO) {
-        val deviceUris = getDevicePhotoUris()
+        val devicePhotos = getDevicePhotosWithDate()
+        val deviceUris = devicePhotos.map { it.first }.toSet()
+        val deviceUriMap = devicePhotos.associate { it.first to it.second }
         val dbUris = photoDao.getAllUris().toSet()
 
         val newUris = deviceUris - dbUris
         val deletedUris = dbUris - deviceUris
 
         if (deletedUris.isNotEmpty()) {
-            photoDao.deleteFtsNotIn(deviceUris)
-            photoDao.deletePhotosNotIn(deviceUris)
+            photoDao.deleteFtsNotIn(deviceUris.toList())
+            photoDao.deletePhotosNotIn(deviceUris.toList())
         }
 
         if (newUris.isNotEmpty()) {
             val newPhotos = newUris.map { uri ->
-                PhotoEntity(uri = uri, dateAdded = getDateAdded(uri))
+                PhotoEntity(uri = uri, dateAdded = deviceUriMap[uri] ?: System.currentTimeMillis())
             }
             photoDao.insertPhotos(newPhotos)
         }
@@ -84,9 +120,9 @@ class PhotoRepositoryImpl(
         true
     }
 
-    private fun getDevicePhotoUris(): List<String> {
-        val uris = mutableListOf<String>()
-        val projection = arrayOf(MediaStore.Images.Media._ID)
+    private fun getDevicePhotosWithDate(): List<Pair<String, Long>> {
+        val result = mutableListOf<Pair<String, Long>>()
+        val projection = arrayOf(MediaStore.Images.Media._ID, MediaStore.Images.Media.DATE_ADDED)
         val cursor = context.contentResolver.query(
             MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
             projection,
@@ -95,39 +131,81 @@ class PhotoRepositoryImpl(
             "${MediaStore.Images.Media.DATE_ADDED} DESC"
         )
         cursor?.use {
-            val idColumn = it.getColumnIndex(MediaStore.Images.Media._ID)
+            val idCol = it.getColumnIndex(MediaStore.Images.Media._ID)
+            val dateCol = it.getColumnIndex(MediaStore.Images.Media.DATE_ADDED)
             while (it.moveToNext()) {
-                val id = it.getLong(idColumn)
-                val uri = Uri.withAppendedPath(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id.toString())
-                uris.add(uri.toString())
+                val id = it.getLong(idCol)
+                val dateAdded = it.getLong(dateCol) * 1000L
+                val uri = Uri.withAppendedPath(
+                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                    id.toString()
+                ).toString()
+                result.add(uri to dateAdded)
             }
         }
-        return uris
+        return result
     }
 
-    private fun getDateAdded(uriStr: String): Long {
-        return try {
-            val cursor = context.contentResolver.query(
-                Uri.parse(uriStr),
-                arrayOf(MediaStore.Images.Media.DATE_ADDED),
-                null,
-                null,
-                null
-            )
-            cursor?.use {
-                if (it.moveToFirst()) {
-                    it.getLong(it.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)) * 1000L
-                } else System.currentTimeMillis()
-            } ?: System.currentTimeMillis()
-        } catch (e: Exception) {
-            System.currentTimeMillis()
+    override fun getAllPhotosGridPaged(
+        searchText: String,
+        filterTextOnly: Boolean
+    ): Flow<PagingData<PhotoListItem>> {
+        return createPager(searchText, filterTextOnly, false).flow.map { pagingData ->
+            pagingData.map<PhotoEntity, PhotoListItem> { PhotoListItem.Photo(it) }
         }
+    }
+
+    private fun createPager(
+        searchText: String,
+        filterTextOnly: Boolean,
+        favoritesOnly: Boolean
+    ): Pager<Int, PhotoEntity> {
+        return Pager(
+            config = PagingConfig(pageSize = 30, initialLoadSize = 90, enablePlaceholders = false),
+            pagingSourceFactory = {
+                when {
+                    searchText.isNotBlank() || filterTextOnly || favoritesOnly ->
+                        SearchPagingSource(searchText, filterTextOnly, favoritesOnly, photoDao)
+                    filterTextOnly -> photoDao.getPhotosWithTextPaged()
+                    else -> photoDao.getAllPhotosPaged()
+                }
+            }
+        )
     }
 
     companion object {
-        fun buildFtsQuery(searchText: String): String {
-            val parts = searchText.trim().split(Regex("\\s+"))
-            return parts.joinToString(" ") { "${it}*" }
+        fun getSectionLabel(dateAdded: Long): String {
+            val calendar = Calendar.getInstance()
+            calendar.set(Calendar.HOUR_OF_DAY, 0)
+            calendar.set(Calendar.MINUTE, 0)
+            calendar.set(Calendar.SECOND, 0)
+            calendar.set(Calendar.MILLISECOND, 0)
+            val startOfToday = calendar.timeInMillis
+            calendar.add(Calendar.DAY_OF_YEAR, -1)
+            val startOfYesterday = calendar.timeInMillis
+            return when {
+                dateAdded >= startOfToday -> "Today"
+                dateAdded >= startOfYesterday -> "Yesterday"
+                else -> "Older"
+            }
         }
     }
+}
+
+private class SearchPagingSource(
+    private val searchText: String,
+    private val filterTextOnly: Boolean,
+    private val favoritesOnly: Boolean,
+    private val photoDao: PhotoDao
+) : PagingSource<Int, PhotoEntity>() {
+    override suspend fun load(params: LoadParams<Int>): LoadResult<Int, PhotoEntity> {
+        return try {
+            val query = PhotoDao.createSearchQuery(searchText, filterTextOnly, favoritesOnly)
+            photoDao.searchPhotosPaged(query).load(params)
+        } catch (e: Exception) {
+            LoadResult.Error(e)
+        }
+    }
+
+    override fun getRefreshKey(state: PagingState<Int, PhotoEntity>): Int? = null
 }

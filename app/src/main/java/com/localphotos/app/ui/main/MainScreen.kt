@@ -11,12 +11,18 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ViewList
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,12 +32,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.clickable
+import androidx.paging.LoadState
+import androidx.paging.compose.collectAsLazyPagingItems
 import coil.compose.AsyncImage
-import com.localphotos.app.data.local.entities.PhotoEntity
-import com.localphotos.app.data.local.entities.PhotoGroup
-import com.localphotos.app.ui.components.PhotoFilterChips
+import coil.request.ImageRequest
+import com.localphotos.app.data.local.entities.PhotoListItem
 import com.localphotos.app.ui.components.PhotoSearchBar
 import org.koin.androidx.compose.koinViewModel
 
@@ -43,14 +51,17 @@ fun MainScreen(
     viewModel: MainViewModel = koinViewModel()
 ) {
     val searchQuery by viewModel.searchQuery.collectAsState()
-    val selectedFilter by viewModel.selectedFilter.collectAsState()
     val pendingCount by viewModel.pendingCount.collectAsState()
     val isProcessing by viewModel.isProcessing.collectAsState()
-    val photoGroups by viewModel.photos.collectAsState()
+    val isGridView by viewModel.isGridView.collectAsState()
+
+    val listItems = viewModel.listPhotos.collectAsLazyPagingItems()
+    val gridItems = viewModel.gridPhotos.collectAsLazyPagingItems()
+    val currentItems = if (isGridView) gridItems else listItems
     val listState = rememberLazyListState()
 
-    LaunchedEffect(photoGroups) {
-        if (photoGroups.isNotEmpty()) {
+    LaunchedEffect(searchQuery) {
+        if (currentItems.itemCount > 0) {
             listState.scrollToItem(0)
         }
     }
@@ -60,16 +71,26 @@ fun MainScreen(
     }
 
     Column(modifier = modifier.fillMaxSize()) {
-        PhotoSearchBar(
-            query = searchQuery,
-            onQueryChange = viewModel::onSearchQueryChange,
-            placeholder = "Search photos by text\u2026"
-        )
-
-        PhotoFilterChips(
-            selectedFilter = selectedFilter,
-            onFilterSelected = viewModel::onFilterChange
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            PhotoSearchBar(
+                query = searchQuery,
+                onQueryChange = viewModel::onSearchQueryChange,
+                placeholder = "Search photos by text\u2026",
+                modifier = Modifier.weight(1f)
+            )
+            IconButton(onClick = { viewModel.toggleViewMode() }) {
+                Icon(
+                    if (isGridView) Icons.AutoMirrored.Filled.ViewList else Icons.Filled.GridView,
+                    contentDescription = if (isGridView) "List view" else "Grid view",
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
 
         if (pendingCount > 0 && isProcessing) {
             Text(
@@ -82,90 +103,132 @@ fun MainScreen(
             )
         }
 
-        if (photoGroups.isEmpty() && !isProcessing) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    "No photos found",
-                    style = MaterialTheme.typography.bodyLarge
-                )
-            }
-        } else if (photoGroups.isEmpty() && isProcessing) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(modifier = Modifier.size(32.dp))
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                state = listState,
-                contentPadding = PaddingValues(bottom = 80.dp)
-            ) {
-                photoGroups.forEach { group ->
-                    item(key = "header_${group.header}") {
-                        SectionHeader(header = group.header)
-                    }
-                    item(key = "photos_${group.header}") {
-                        PhotoSectionGrid(
-                            photos = group.photos,
-                            onPhotoClick = onPhotoClick
-                        )
-                    }
+        when {
+            currentItems.loadState.refresh is LoadState.Loading && currentItems.itemCount == 0 -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(32.dp))
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun SectionHeader(header: String) {
-    Text(
-        text = header,
-        style = MaterialTheme.typography.titleMedium,
-        color = MaterialTheme.colorScheme.onSurface,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-    )
-}
-
-@Composable
-private fun PhotoSectionGrid(
-    photos: List<PhotoEntity>,
-    onPhotoClick: (String) -> Unit
-) {
-    val chunked = photos.chunked(3)
-    Column(modifier = Modifier.fillMaxWidth()) {
-        chunked.forEach { rowPhotos ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 1.dp),
-                horizontalArrangement = Arrangement.spacedBy(1.dp)
-            ) {
-                rowPhotos.forEach { photo ->
-                    Card(
-                        modifier = Modifier
-                            .weight(1f)
-                            .aspectRatio(1f)
-                            .clickable { onPhotoClick(photo.uri) },
-                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            currentItems.loadState.refresh is LoadState.Error && currentItems.itemCount == 0 -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "No photos found",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                }
+            }
+            currentItems.itemCount == 0 -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "No photos found",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                }
+            }
+            else -> {
+                if (isGridView) {
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(3),
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(1.dp)
                     ) {
-                        AsyncImage(
-                            model = photo.uri,
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
-                        )
+                        items(currentItems.itemCount) { index ->
+                            val item = currentItems[index]
+                            if (item is PhotoListItem.Photo) {
+                                Card(
+                                    modifier = Modifier
+                                        .aspectRatio(1f)
+                                        .padding(1.dp)
+                                        .clickable { onPhotoClick(item.entity.uri) },
+                                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                                ) {
+                                    AsyncImage(
+                                        model = ImageRequest.Builder(LocalContext.current)
+                                            .data(item.entity.uri)
+                                            .size(300)
+                                            .crossfade(false)
+                                            .build(),
+                                        contentDescription = null,
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                }
+                            }
+                        }
                     }
-                }
-                if (rowPhotos.size < 3) {
-                    repeat(3 - rowPhotos.size) {
-                        Box(modifier = Modifier.weight(1f).aspectRatio(1f))
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        state = listState,
+                        contentPadding = PaddingValues(bottom = 80.dp)
+                    ) {
+                        items(currentItems.itemCount) { index ->
+                            when (val item = currentItems[index]) {
+                                is PhotoListItem.Header -> {
+                                    Text(
+                                        text = item.label,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                                    )
+                                }
+                                is PhotoListItem.Photo -> {
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                                            .clickable { onPhotoClick(item.entity.uri) },
+                                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                                    ) {
+                                        Row(modifier = Modifier.fillMaxWidth()) {
+                                            AsyncImage(
+                                                model = ImageRequest.Builder(LocalContext.current)
+                                                    .data(item.entity.uri)
+                                                    .size(300)
+                                                    .crossfade(false)
+                                                    .build(),
+                                                contentDescription = null,
+                                                modifier = Modifier
+                                                    .size(100.dp)
+                                                    .aspectRatio(1f),
+                                                contentScale = ContentScale.Crop
+                                            )
+                                            Column(
+                                                modifier = Modifier
+                                                    .padding(12.dp)
+                                                    .weight(1f)
+                                            ) {
+                                                if (item.entity.text.isNotBlank()) {
+                                                    Text(
+                                                        text = item.entity.text,
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        maxLines = 2,
+                                                        color = MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                }
+                                                Text(
+                                                    text = if (item.entity.isFavorite) "\u2605 Favorite" else "",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.primary
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                                else -> {}
+                            }
+                        }
                     }
                 }
             }
