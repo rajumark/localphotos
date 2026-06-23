@@ -3,11 +3,6 @@ package com.localphotos.app.data.repository
 import android.content.Context
 import android.net.Uri
 import android.provider.MediaStore
-import androidx.paging.Pager
-import androidx.paging.PagingConfig
-import androidx.paging.PagingData
-import androidx.paging.PagingSource
-import androidx.paging.PagingState
 import com.localphotos.app.data.local.PhotoDao
 import com.localphotos.app.data.local.entities.PhotoEntity
 import com.localphotos.app.data.local.entities.PhotoFtsEntity
@@ -22,55 +17,27 @@ class PhotoRepositoryImpl(
     private val ocrProcessor: OCRProcessor
 ) : PhotoRepository {
 
-    override fun getAllPhotosPaged(
+    override fun getAllPhotos(
         searchText: String,
         filterTextOnly: Boolean
-    ): Flow<PagingData<PhotoEntity>> {
-        return Pager(
-            config = PagingConfig(pageSize = 30, initialLoadSize = 120, enablePlaceholders = false),
-            pagingSourceFactory = {
-                if (searchText.isNotBlank() || filterTextOnly) {
-                    object : PagingSource<Int, PhotoEntity>() {
-                        override suspend fun load(params: LoadParams<Int>): LoadResult<Int, PhotoEntity> {
-                            return try {
-                                val query = PhotoDao.createSearchQuery(searchText, filterTextOnly)
-                                photoDao.searchPhotosPaged(query).load(params)
-                            } catch (e: Exception) {
-                                LoadResult.Error(e)
-                            }
-                        }
-                        override fun getRefreshKey(state: PagingState<Int, PhotoEntity>): Int? = null
-                    }
-                } else {
-                    photoDao.getAllPhotosPaged()
-                }
-            }
-        ).flow
+    ): Flow<List<PhotoEntity>> {
+        return when {
+            searchText.isNotBlank() && filterTextOnly ->
+                photoDao.searchPhotosWithText(buildFtsQuery(searchText))
+            searchText.isNotBlank() ->
+                photoDao.searchPhotos(buildFtsQuery(searchText))
+            filterTextOnly ->
+                photoDao.getPhotosWithText()
+            else ->
+                photoDao.getAllPhotos()
+        }
     }
 
-    override fun getFavoritePhotosPaged(searchText: String): Flow<PagingData<PhotoEntity>> {
+    override fun getFavoritePhotos(searchText: String): Flow<List<PhotoEntity>> {
         return if (searchText.isNotBlank()) {
-            Pager(
-                config = PagingConfig(pageSize = 30, initialLoadSize = 120, enablePlaceholders = false),
-                pagingSourceFactory = {
-                    object : PagingSource<Int, PhotoEntity>() {
-                        override suspend fun load(params: LoadParams<Int>): LoadResult<Int, PhotoEntity> {
-                            return try {
-                                val query = PhotoDao.createSearchQuery(searchText, true)
-                                photoDao.searchPhotosPaged(query).load(params)
-                            } catch (e: Exception) {
-                                LoadResult.Error(e)
-                            }
-                        }
-                        override fun getRefreshKey(state: PagingState<Int, PhotoEntity>): Int? = null
-                    }
-                }
-            ).flow
+            photoDao.searchFavoritePhotos(buildFtsQuery(searchText))
         } else {
-            Pager(
-                config = PagingConfig(pageSize = 30, initialLoadSize = 120, enablePlaceholders = false),
-                pagingSourceFactory = { photoDao.getFavoritePhotosPaged() }
-            ).flow
+            photoDao.getFavoritePhotos()
         }
     }
 
@@ -154,6 +121,13 @@ class PhotoRepositoryImpl(
             } ?: System.currentTimeMillis()
         } catch (e: Exception) {
             System.currentTimeMillis()
+        }
+    }
+
+    companion object {
+        fun buildFtsQuery(searchText: String): String {
+            val parts = searchText.trim().split(Regex("\\s+"))
+            return parts.joinToString(" ") { "${it}*" }
         }
     }
 }

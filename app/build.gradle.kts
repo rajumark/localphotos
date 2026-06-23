@@ -30,13 +30,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            isMinifyEnabled = false
             signingConfig = signingConfigs.getByName("release")
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
         }
     }
 
@@ -75,12 +70,7 @@ dependencies {
     // Room
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
-    implementation("androidx.room:room-paging:2.6.1")
     ksp("androidx.room:room-compiler:2.6.1")
-
-    // Paging
-    implementation("androidx.paging:paging-compose:3.3.2")
-    implementation("androidx.paging:paging-runtime-ktx:3.3.2")
 
     // ML Kit Text Recognition
     implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.1")

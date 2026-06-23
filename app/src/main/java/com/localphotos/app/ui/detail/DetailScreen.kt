@@ -1,6 +1,8 @@
 package com.localphotos.app.ui.detail
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
@@ -116,58 +119,37 @@ fun DetailScreen(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = { showTextSheet = true }) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.TextSnippet,
-                            contentDescription = "Text",
-                            tint = Color.White,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Text("Text", color = Color.White, style = MaterialTheme.typography.labelSmall)
-                    }
-                }
+                ActionItem(
+                    icon = { Icon(Icons.AutoMirrored.Filled.TextSnippet, contentDescription = "Text", tint = Color.White, modifier = Modifier.size(24.dp)) },
+                    label = "Text",
+                    onClick = { showTextSheet = true }
+                )
 
-                IconButton(onClick = { viewModel.sharePhoto(context) }) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            Icons.Filled.Share,
-                            contentDescription = "Share",
-                            tint = Color.White,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Text("Share", color = Color.White, style = MaterialTheme.typography.labelSmall)
-                    }
-                }
+                ActionItem(
+                    icon = { Icon(Icons.Filled.Share, contentDescription = "Share", tint = Color.White, modifier = Modifier.size(24.dp)) },
+                    label = "Share",
+                    onClick = { viewModel.sharePhoto(context) }
+                )
 
-                IconButton(onClick = { showDeleteDialog = true }) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            Icons.Filled.Delete,
-                            contentDescription = "Delete",
-                            tint = Color.White,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Text("Delete", color = Color.White, style = MaterialTheme.typography.labelSmall)
-                    }
-                }
+                ActionItem(
+                    icon = { Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = Color.White, modifier = Modifier.size(24.dp)) },
+                    label = "Delete",
+                    onClick = { showDeleteDialog = true }
+                )
 
                 if (photo != null) {
-                    IconButton(onClick = { viewModel.toggleFavorite() }) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    ActionItem(
+                        icon = {
                             Icon(
                                 if (photo!!.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                                 contentDescription = "Favorite",
                                 tint = if (photo!!.isFavorite) Color(0xFFFF5252) else Color.White,
                                 modifier = Modifier.size(24.dp)
                             )
-                            Text(
-                                if (photo!!.isFavorite) "Favorited" else "Favorite",
-                                color = Color.White,
-                                style = MaterialTheme.typography.labelSmall
-                            )
-                        }
-                    }
+                        },
+                        label = if (photo!!.isFavorite) "Favorited" else "Favorite",
+                        onClick = { viewModel.toggleFavorite() }
+                    )
                 }
             }
         }
@@ -246,5 +228,26 @@ fun DetailScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ActionItem(
+    icon: @Composable () -> Unit,
+    label: String,
+    onClick: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .width(64.dp)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
+            )
+    ) {
+        icon()
+        Text(label, color = Color.White, style = MaterialTheme.typography.labelSmall)
     }
 }

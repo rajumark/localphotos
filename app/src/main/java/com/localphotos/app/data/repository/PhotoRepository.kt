@@ -1,12 +1,11 @@
 package com.localphotos.app.data.repository
 
-import androidx.paging.PagingData
 import com.localphotos.app.data.local.entities.PhotoEntity
 import kotlinx.coroutines.flow.Flow
 
 interface PhotoRepository {
-    fun getAllPhotosPaged(searchText: String = "", filterTextOnly: Boolean = false): Flow<PagingData<PhotoEntity>>
-    fun getFavoritePhotosPaged(searchText: String = ""): Flow<PagingData<PhotoEntity>>
+    fun getAllPhotos(searchText: String = "", filterTextOnly: Boolean = false): Flow<List<PhotoEntity>>
+    fun getFavoritePhotos(searchText: String = ""): Flow<List<PhotoEntity>>
     fun getPendingCount(): Flow<Int>
     val favoriteCount: Flow<Int>
     suspend fun getPhotoByUri(uri: String): PhotoEntity?
