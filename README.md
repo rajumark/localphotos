@@ -27,7 +27,11 @@
 
 ## Screenshots
 
-*(Add screenshots here)*
+<p align="center">
+  <img src="screenshots/Screenshot_1782202245.png" width="250" alt="Main screen">
+  <img src="screenshots/Screenshot_1782202250.png" width="250" alt="Search results">
+  <img src="screenshots/Screenshot_1782202261.png" width="250" alt="Photo detail">
+</p>
 
 ## Tech Stack
 
