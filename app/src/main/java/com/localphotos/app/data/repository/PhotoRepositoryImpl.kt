@@ -10,12 +10,10 @@ import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import com.localphotos.app.data.local.PhotoDao
 import com.localphotos.app.data.local.entities.PhotoEntity
+import com.localphotos.app.data.local.entities.PhotoFtsEntity
 import com.localphotos.app.ocr.OCRProcessor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.supervisorScope
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 
 class PhotoRepositoryImpl(
@@ -24,14 +22,12 @@ class PhotoRepositoryImpl(
     private val ocrProcessor: OCRProcessor
 ) : PhotoRepository {
 
-    private val ocrSemaphore = Semaphore(2)
-
     override fun getAllPhotosPaged(
         searchText: String,
         filterTextOnly: Boolean
     ): Flow<PagingData<PhotoEntity>> {
         return Pager(
-            config = PagingConfig(pageSize = 30, enablePlaceholders = false),
+            config = PagingConfig(pageSize = 30, initialLoadSize = 120, enablePlaceholders = false),
             pagingSourceFactory = {
                 if (searchText.isNotBlank() || filterTextOnly) {
                     object : PagingSource<Int, PhotoEntity>() {
@@ -55,7 +51,7 @@ class PhotoRepositoryImpl(
     override fun getFavoritePhotosPaged(searchText: String): Flow<PagingData<PhotoEntity>> {
         return if (searchText.isNotBlank()) {
             Pager(
-                config = PagingConfig(pageSize = 30, enablePlaceholders = false),
+                config = PagingConfig(pageSize = 30, initialLoadSize = 120, enablePlaceholders = false),
                 pagingSourceFactory = {
                     object : PagingSource<Int, PhotoEntity>() {
                         override suspend fun load(params: LoadParams<Int>): LoadResult<Int, PhotoEntity> {
@@ -72,13 +68,15 @@ class PhotoRepositoryImpl(
             ).flow
         } else {
             Pager(
-                config = PagingConfig(pageSize = 30, enablePlaceholders = false),
+                config = PagingConfig(pageSize = 30, initialLoadSize = 120, enablePlaceholders = false),
                 pagingSourceFactory = { photoDao.getFavoritePhotosPaged() }
             ).flow
         }
     }
 
     override fun getPendingCount(): Flow<Int> = photoDao.getPendingCount()
+
+    override val favoriteCount: Flow<Int> = photoDao.getFavoriteCount()
 
     override suspend fun getPhotoByUri(uri: String): PhotoEntity? = photoDao.getPhotoByUri(uri)
 
@@ -111,21 +109,12 @@ class PhotoRepositoryImpl(
         }
     }
 
-    override suspend fun processNextBatch() = withContext(Dispatchers.IO) {
-        supervisorScope {
-            val unprocessed = photoDao.getUnprocessedPhotos().take(5)
-            for (photo in unprocessed) {
-                ocrSemaphore.withPermit {
-                    val text = ocrProcessor.extractTextFromUri(Uri.parse(photo.uri))
-                    photoDao.markProcessed(photo.uri, text)
-                    val fts = com.localphotos.app.data.local.entities.PhotoFtsEntity(
-                        uri = photo.uri,
-                        text = text
-                    )
-                    photoDao.insertFts(fts)
-                }
-            }
-        }
+    override suspend fun processOne(): Boolean = withContext(Dispatchers.IO) {
+        val photo = photoDao.getNextUnprocessed() ?: return@withContext false
+        val text = ocrProcessor.extractTextFromUri(Uri.parse(photo.uri))
+        photoDao.markProcessed(photo.uri, text)
+        photoDao.insertFts(PhotoFtsEntity(uri = photo.uri, text = text))
+        true
     }
 
     private fun getDevicePhotoUris(): List<String> {

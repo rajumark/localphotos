@@ -14,6 +14,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
 import org.koin.androidx.compose.koinViewModel
 import com.localphotos.app.ui.components.PhotoGrid
@@ -26,8 +27,7 @@ fun FavoritesScreen(
     viewModel: FavoritesViewModel = koinViewModel()
 ) {
     val searchQuery by viewModel.searchQuery.collectAsState()
-    val photosFlow by viewModel.photos.collectAsState()
-    val photos = photosFlow.collectAsLazyPagingItems()
+    val photos = viewModel.photos.collectAsLazyPagingItems()
 
     Column(modifier = modifier.fillMaxSize()) {
         PhotoSearchBar(
@@ -36,29 +36,44 @@ fun FavoritesScreen(
             placeholder = "Search favorites…"
         )
 
-        if (photos.itemCount == 0 && !photos.loadState.refresh.endOfPaginationReached) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(modifier = Modifier.size(32.dp))
+        when {
+            photos.loadState.refresh is LoadState.Loading && photos.itemCount == 0 -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(32.dp))
+                }
             }
-        } else if (photos.itemCount == 0) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    "No favorites yet",
-                    style = MaterialTheme.typography.bodyLarge
+            photos.loadState.refresh is LoadState.Error && photos.itemCount == 0 -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "No favorites yet",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                }
+            }
+            photos.itemCount == 0 -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "No favorites yet",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                }
+            }
+            else -> {
+                PhotoGrid(
+                    photos = photos.itemSnapshotList.filterNotNull(),
+                    onPhotoClick = onPhotoClick,
+                    modifier = Modifier.fillMaxSize()
                 )
             }
-        } else {
-            PhotoGrid(
-                photos = photos.itemSnapshotList.filterNotNull(),
-                onPhotoClick = onPhotoClick,
-                modifier = Modifier.fillMaxSize()
-            )
         }
     }
 }

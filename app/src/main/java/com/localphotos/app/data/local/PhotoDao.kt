@@ -45,11 +45,14 @@ interface PhotoDao {
     @Query("SELECT * FROM photos WHERE isFavorite = 1 ORDER BY dateAdded DESC")
     fun getFavoritePhotosPaged(): PagingSource<Int, PhotoEntity>
 
+    @Query("SELECT COUNT(*) FROM photos WHERE isFavorite = 1")
+    fun getFavoriteCount(): kotlinx.coroutines.flow.Flow<Int>
+
     @Query("SELECT * FROM photos WHERE uri = :uri")
     suspend fun getPhotoByUri(uri: String): PhotoEntity?
 
-    @Query("SELECT * FROM photos WHERE isTextProcessed = 0")
-    suspend fun getUnprocessedPhotos(): List<PhotoEntity>
+    @Query("SELECT * FROM photos WHERE isTextProcessed = 0 ORDER BY dateAdded ASC LIMIT 1")
+    suspend fun getNextUnprocessed(): PhotoEntity?
 
     @Query("SELECT COUNT(*) FROM photos WHERE isTextProcessed = 0")
     fun getPendingCount(): kotlinx.coroutines.flow.Flow<Int>
@@ -70,7 +73,9 @@ interface PhotoDao {
         fun createSearchQuery(searchText: String, filterTextOnly: Boolean): SupportSQLiteQuery {
             val conditions = mutableListOf<String>()
             if (searchText.isNotBlank()) {
-                val escaped = searchText.replace("'", "''")
+                val parts = searchText.trim().split(Regex("\\s+"))
+                val ftsTerms = parts.joinToString(" ") { "${it}*" }
+                val escaped = ftsTerms.replace("'", "''")
                 conditions.add(
                     "photos.uri IN (SELECT uri FROM photos_fts WHERE photos_fts.text MATCH '$escaped')"
                 )
