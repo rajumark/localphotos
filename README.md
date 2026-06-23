@@ -11,7 +11,7 @@
 </p>
 
 ## Features
-
+ 
 - **OCR-powered search** — All photos are scanned using ML Kit Text Recognition v2 to extract text, enabling full-text search
 - **Full-text search** — Search across all extracted text instantly with FTS4
 - **Material Design 3** — Modern UI with Compose, dynamic color support (Android 12+)
