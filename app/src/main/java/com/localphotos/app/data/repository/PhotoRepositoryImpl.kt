@@ -22,6 +22,7 @@ import com.localphotos.app.data.local.entities.PhotoFtsEntity
 import com.localphotos.app.data.local.entities.PhotoLabelEntity
 import com.localphotos.app.data.local.entities.PhotoListItem
 import com.localphotos.app.faceprocessing.FaceProcessor
+import com.localphotos.app.faceprocessing.FaceStats
 import com.localphotos.app.labeling.LabelProcessor
 import com.localphotos.app.ocr.OCRProcessor
 import kotlinx.coroutines.Dispatchers
@@ -35,7 +36,8 @@ class PhotoRepositoryImpl(
     private val photoDao: PhotoDao,
     private val ocrProcessor: OCRProcessor,
     private val labelProcessor: LabelProcessor,
-    private val faceProcessor: FaceProcessor
+    private val faceProcessor: FaceProcessor,
+    private val faceStats: FaceStats
 ) : PhotoRepository {
 
     override fun getAllPhotosPaged(
@@ -178,12 +180,16 @@ class PhotoRepositoryImpl(
 
     override suspend fun processOne(): Boolean = withContext(Dispatchers.IO) {
         val photo = photoDao.getNextUnprocessed() ?: return@withContext false
-        val uri = Uri.parse(photo.uri)
-        val filename = getPhotoDisplayName(uri)
-        val text = ocrProcessor.extractTextFromUri(uri)
-        val ftsText = if (filename != null) "$filename $text" else text
-        photoDao.markProcessed(photo.uri, text)
-        photoDao.insertFts(PhotoFtsEntity(uri = photo.uri, text = ftsText))
+        try {
+            val uri = Uri.parse(photo.uri)
+            val filename = getPhotoDisplayName(uri)
+            val text = ocrProcessor.extractTextFromUri(uri)
+            val ftsText = if (filename != null) "$filename $text" else text
+            photoDao.markProcessed(photo.uri, text)
+            photoDao.insertFts(PhotoFtsEntity(uri = photo.uri, text = ftsText))
+        } catch (e: Exception) {
+            photoDao.markProcessed(photo.uri, "")
+        }
         true
     }
 
@@ -205,12 +211,15 @@ class PhotoRepositoryImpl(
 
     override suspend fun processOneLabel(): Boolean = withContext(Dispatchers.IO) {
         val photo = photoDao.getNextUnlabeled() ?: return@withContext false
-        val uri = Uri.parse(photo.uri)
-        val labels = labelProcessor.extractLabelsFromUri(uri)
-        if (labels.isNotEmpty()) {
-            photoDao.insertPhotoLabels(labels.map {
-                PhotoLabelEntity(uri = photo.uri, label = it.text, confidence = it.confidence)
-            })
+        try {
+            val uri = Uri.parse(photo.uri)
+            val labels = labelProcessor.extractLabelsFromUri(uri)
+            if (labels.isNotEmpty()) {
+                photoDao.insertPhotoLabels(labels.map {
+                    PhotoLabelEntity(uri = photo.uri, label = it.text, confidence = it.confidence)
+                })
+            }
+        } catch (e: Exception) {
         }
         photoDao.markLabelProcessed(photo.uri)
         true
@@ -220,22 +229,28 @@ class PhotoRepositoryImpl(
 
     override suspend fun processOneFace(): Boolean = withContext(Dispatchers.IO) {
         val photo = photoDao.getNextUnfaced() ?: return@withContext false
-        val uri = Uri.parse(photo.uri)
-        val result = faceProcessor.detectFacesFromUri(uri)
-        if (result.faces.isNotEmpty()) {
-            val faces = result.faces.mapIndexed { index, rect ->
-                FaceEntity(
-                    uri = photo.uri,
-                    faceIndex = index,
-                    left = rect.left,
-                    top = rect.top,
-                    right = rect.right,
-                    bottom = rect.bottom
-                )
+        try {
+            val uri = Uri.parse(photo.uri)
+            val result = faceProcessor.detectFacesFromUri(uri)
+            if (result.faces.isNotEmpty()) {
+                val faces = result.faces.mapIndexed { index, rect ->
+                    FaceEntity(
+                        uri = photo.uri,
+                        faceIndex = index,
+                        left = rect.left,
+                        top = rect.top,
+                        right = rect.right,
+                        bottom = rect.bottom
+                    )
+                }
+                photoDao.insertFaces(faces)
             }
-            photoDao.insertFaces(faces)
+            faceStats.recordSuccess(result.faces.size)
+            photoDao.markFaceProcessed(photo.uri, result.faces.size)
+        } catch (e: Exception) {
+            faceStats.recordError(photo.uri, e.message ?: "Unknown error")
+            photoDao.markFaceProcessed(photo.uri, 0)
         }
-        photoDao.markFaceProcessed(photo.uri, result.faces.size)
         true
     }
 

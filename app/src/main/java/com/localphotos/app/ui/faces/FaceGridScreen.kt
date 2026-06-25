@@ -1,5 +1,6 @@
 package com.localphotos.app.ui.faces
 
+import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -7,8 +8,10 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
@@ -22,8 +25,10 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
@@ -108,6 +113,7 @@ fun FaceGridScreen(
                 }
             }
         } else {
+            var showStatsDialog by remember { mutableStateOf(false) }
             TopAppBar(
                 title = { Text("Faces") },
                 navigationIcon = {
@@ -115,11 +121,22 @@ fun FaceGridScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
+                actions = {
+                    IconButton(onClick = { showStatsDialog = true }) {
+                        Icon(Icons.Filled.BugReport, contentDescription = "Debug stats")
+                    }
+                },
                 windowInsets = WindowInsets(0, 0, 0, 0),
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface
                 )
             )
+            if (showStatsDialog) {
+                StatsDialog(
+                    viewModel = viewModel,
+                    onDismiss = { showStatsDialog = false }
+                )
+            }
         }
 
         LazyRow(
@@ -269,4 +286,45 @@ fun FaceGridScreen(
             }
         )
     }
+}
+
+@Composable
+private fun StatsDialog(
+    viewModel: FaceGridViewModel,
+    onDismiss: () -> Unit
+) {
+    val totalProcessed by viewModel.faceStats.totalProcessed.collectAsState()
+    val totalFacesFound by viewModel.faceStats.totalFacesFound.collectAsState()
+    val totalErrors by viewModel.faceStats.totalErrors.collectAsState()
+    val errorMessages by viewModel.faceStats.errorMessages.collectAsState()
+    val context = LocalContext.current
+
+    val summary = remember(totalProcessed, totalFacesFound, totalErrors, errorMessages) {
+        viewModel.faceStats.formatSummary()
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Face Processing Stats") },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text(text = summary, style = MaterialTheme.typography.bodySmall)
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = {
+                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                val clip = android.content.ClipData.newPlainText("Face Stats", summary)
+                clipboard.setPrimaryClip(clip)
+            }) {
+                Icon(Icons.Filled.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                Text(" Copy")
+            }
+        }
+    )
 }

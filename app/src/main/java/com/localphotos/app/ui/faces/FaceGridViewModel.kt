@@ -10,6 +10,7 @@ import androidx.paging.cachedIn
 import com.localphotos.app.data.local.entities.FaceCountFilter
 import com.localphotos.app.data.local.entities.PhotoEntity
 import com.localphotos.app.data.repository.PhotoRepository
+import com.localphotos.app.faceprocessing.FaceStats
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,7 +21,8 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class FaceGridViewModel(
-    private val repository: PhotoRepository
+    private val repository: PhotoRepository,
+    val faceStats: FaceStats
 ) : ViewModel() {
 
     private val _faceFilter = MutableStateFlow(FaceCountFilter.ALL)

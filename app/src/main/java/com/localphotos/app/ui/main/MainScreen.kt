@@ -150,9 +150,13 @@ fun MainScreen(
         }
 
         if (isProcessing) {
-            val total = pendingCount + labelPendingCount + facePendingCount
+            val parts = mutableListOf<String>()
+            if (pendingCount > 0) parts.add("OCR: $pendingCount")
+            if (labelPendingCount > 0) parts.add("Labels: $labelPendingCount")
+            if (facePendingCount > 0) parts.add("Faces: $facePendingCount")
+            val text = if (parts.isNotEmpty()) parts.joinToString("  ") else "scanning\u2026"
             Text(
-                text = "${total} scanning\u2026",
+                text = text,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier

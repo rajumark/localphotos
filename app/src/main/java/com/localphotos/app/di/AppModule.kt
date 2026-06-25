@@ -6,6 +6,7 @@ import com.localphotos.app.data.local.PhotoDao
 import com.localphotos.app.data.repository.PhotoRepository
 import com.localphotos.app.data.repository.PhotoRepositoryImpl
 import com.localphotos.app.faceprocessing.FaceProcessor
+import com.localphotos.app.faceprocessing.FaceStats
 import com.localphotos.app.labeling.LabelProcessor
 import com.localphotos.app.ocr.OCRProcessor
 import com.localphotos.app.ui.detail.DetailViewModel
@@ -36,13 +37,16 @@ val appModule = module {
 
     single { FaceProcessor(androidContext()) }
 
+    single { FaceStats() }
+
     single<PhotoRepository> {
         PhotoRepositoryImpl(
             context = androidContext(),
             photoDao = get(),
             ocrProcessor = get(),
             labelProcessor = get(),
-            faceProcessor = get()
+            faceProcessor = get(),
+            faceStats = get()
         ) as PhotoRepository
     }
 
@@ -53,5 +57,5 @@ val appModule = module {
     viewModel { FavoritesViewModel(get()) }
     viewModel { LabelsViewModel(get()) }
     viewModel { AlbumsViewModel(get()) }
-    viewModel { FaceGridViewModel(get()) }
+    viewModel { FaceGridViewModel(get(), get()) }
 }

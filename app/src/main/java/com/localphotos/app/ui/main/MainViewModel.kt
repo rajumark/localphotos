@@ -169,30 +169,34 @@ class MainViewModel(
 
     private suspend fun refreshAndProcess() {
         repository.refreshPhotos()
-        if (_pendingCount.value > 0 || _labelPendingCount.value > 0) startProcessing()
+        startProcessing()
     }
 
     private fun startProcessing() {
         processingJob?.cancel()
         processingJob = viewModelScope.launch {
             _isProcessing.value = true
-            while (true) {
-                val hasMore = repository.processOne()
-                if (!hasMore) break
-                delay(100)
+            try {
+                while (true) {
+                    val hasMore = repository.processOne()
+                    if (!hasMore) break
+                    delay(100)
+                }
+                while (true) {
+                    val hasMore = repository.processOneLabel()
+                    if (!hasMore) break
+                    delay(100)
+                }
+                while (true) {
+                    val hasMore = repository.processOneFace()
+                    if (!hasMore) break
+                    delay(100)
+                }
+            } catch (_: Exception) {
+            } finally {
+                _isProcessing.value = false
+                processingJob = null
             }
-            while (true) {
-                val hasMore = repository.processOneLabel()
-                if (!hasMore) break
-                delay(100)
-            }
-            while (true) {
-                val hasMore = repository.processOneFace()
-                if (!hasMore) break
-                delay(100)
-            }
-            _isProcessing.value = false
-            processingJob = null
         }
     }
 
