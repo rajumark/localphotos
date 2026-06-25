@@ -95,7 +95,13 @@ fun FavoritesScreen(
                     state = listState,
                     contentPadding = PaddingValues(bottom = 80.dp)
                 ) {
-                    items(photos.itemCount) { index ->
+                    items(photos.itemCount, key = { index ->
+                        when (val item = photos[index]) {
+                            is PhotoListItem.Header -> "header_${item.label}_$index"
+                            is PhotoListItem.Photo -> "${item.entity.uri}_$index"
+                            else -> index
+                        }
+                    }) { index ->
                         when (val item = photos[index]) {
                             is PhotoListItem.Header -> {
                                 Text(

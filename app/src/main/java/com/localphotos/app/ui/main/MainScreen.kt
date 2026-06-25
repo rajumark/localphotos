@@ -29,6 +29,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
@@ -55,19 +58,13 @@ fun MainScreen(
     val isProcessing by viewModel.isProcessing.collectAsState()
     val isGridView by viewModel.isGridView.collectAsState()
 
-    val listItems = viewModel.listPhotos.collectAsLazyPagingItems()
-    val gridItems = viewModel.gridPhotos.collectAsLazyPagingItems()
-    val currentItems = if (isGridView) gridItems else listItems
+    val currentItems = viewModel.photos.collectAsLazyPagingItems()
     val listState = rememberLazyListState()
 
     LaunchedEffect(searchQuery) {
         if (currentItems.itemCount > 0) {
             listState.scrollToItem(0)
         }
-    }
-
-    LaunchedEffect(Unit) {
-        viewModel.onResume()
     }
 
     Column(modifier = modifier.fillMaxSize()) {
@@ -141,7 +138,12 @@ fun MainScreen(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(1.dp)
                     ) {
-                        items(currentItems.itemCount) { index ->
+                        items(currentItems.itemCount, key = { index ->
+                            when (val item = currentItems[index]) {
+                                is PhotoListItem.Photo -> "${item.entity.uri}_$index"
+                                else -> index
+                            }
+                        }) { index ->
                             val item = currentItems[index]
                             if (item is PhotoListItem.Photo) {
                                 Card(
@@ -154,7 +156,7 @@ fun MainScreen(
                                     AsyncImage(
                                         model = ImageRequest.Builder(LocalContext.current)
                                             .data(item.entity.uri)
-                                            .size(300)
+                                            .size(150)
                                             .crossfade(false)
                                             .build(),
                                         contentDescription = null,
@@ -171,7 +173,13 @@ fun MainScreen(
                         state = listState,
                         contentPadding = PaddingValues(bottom = 80.dp)
                     ) {
-                        items(currentItems.itemCount) { index ->
+                        items(currentItems.itemCount, key = { index ->
+                            when (val item = currentItems[index]) {
+                                is PhotoListItem.Header -> "header_${item.label}_$index"
+                                is PhotoListItem.Photo -> "${item.entity.uri}_$index"
+                                else -> index
+                            }
+                        }) { index ->
                             when (val item = currentItems[index]) {
                                 is PhotoListItem.Header -> {
                                     Text(

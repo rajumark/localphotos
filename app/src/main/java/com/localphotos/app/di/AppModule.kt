@@ -8,6 +8,7 @@ import com.localphotos.app.data.repository.PhotoRepositoryImpl
 import com.localphotos.app.ocr.OCRProcessor
 import com.localphotos.app.ui.detail.DetailViewModel
 import com.localphotos.app.ui.favorites.FavoritesViewModel
+import android.content.Context
 import com.localphotos.app.ui.main.MainViewModel
 import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.viewmodel.dsl.viewModel
@@ -34,7 +35,9 @@ val appModule = module {
         ) as PhotoRepository
     }
 
-    viewModel { MainViewModel(get()) }
+    single { androidContext().getSharedPreferences("local_photos_prefs", Context.MODE_PRIVATE) }
+
+    viewModel { MainViewModel(get(), get()) }
     viewModel { DetailViewModel(get()) }
     viewModel { FavoritesViewModel(get()) }
 }

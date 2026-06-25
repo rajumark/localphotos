@@ -50,7 +50,7 @@ class PhotoRepositoryImpl(
 
     override fun getFavoritePhotosPaged(searchText: String): Flow<PagingData<PhotoListItem>> {
         return Pager(
-            config = PagingConfig(pageSize = 30, initialLoadSize = 90, enablePlaceholders = false),
+            config = PagingConfig(pageSize = 30, initialLoadSize = 90, enablePlaceholders = true),
             pagingSourceFactory = {
                 if (searchText.isNotBlank()) {
                     SearchPagingSource(searchText, false, true, photoDao)
@@ -161,7 +161,7 @@ class PhotoRepositoryImpl(
         favoritesOnly: Boolean
     ): Pager<Int, PhotoEntity> {
         return Pager(
-            config = PagingConfig(pageSize = 30, initialLoadSize = 90, enablePlaceholders = false),
+            config = PagingConfig(pageSize = 30, initialLoadSize = 90, enablePlaceholders = true),
             pagingSourceFactory = {
                 when {
                     searchText.isNotBlank() || filterTextOnly || favoritesOnly ->
@@ -174,18 +174,26 @@ class PhotoRepositoryImpl(
     }
 
     companion object {
+        private var cachedStartOfToday = 0L
+        private var cachedStartOfYesterday = 0L
+        private var lastCacheTime = 0L
+
         fun getSectionLabel(dateAdded: Long): String {
-            val calendar = Calendar.getInstance()
-            calendar.set(Calendar.HOUR_OF_DAY, 0)
-            calendar.set(Calendar.MINUTE, 0)
-            calendar.set(Calendar.SECOND, 0)
-            calendar.set(Calendar.MILLISECOND, 0)
-            val startOfToday = calendar.timeInMillis
-            calendar.add(Calendar.DAY_OF_YEAR, -1)
-            val startOfYesterday = calendar.timeInMillis
+            val now = System.currentTimeMillis()
+            if (now - lastCacheTime > 60_000) {
+                val calendar = Calendar.getInstance()
+                calendar.set(Calendar.HOUR_OF_DAY, 0)
+                calendar.set(Calendar.MINUTE, 0)
+                calendar.set(Calendar.SECOND, 0)
+                calendar.set(Calendar.MILLISECOND, 0)
+                cachedStartOfToday = calendar.timeInMillis
+                calendar.add(Calendar.DAY_OF_YEAR, -1)
+                cachedStartOfYesterday = calendar.timeInMillis
+                lastCacheTime = now
+            }
             return when {
-                dateAdded >= startOfToday -> "Today"
-                dateAdded >= startOfYesterday -> "Yesterday"
+                dateAdded >= cachedStartOfToday -> "Today"
+                dateAdded >= cachedStartOfYesterday -> "Yesterday"
                 else -> "Older"
             }
         }

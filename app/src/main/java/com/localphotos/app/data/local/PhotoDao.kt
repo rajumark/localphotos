@@ -58,7 +58,7 @@ interface PhotoDao {
     @Query("SELECT * FROM photos WHERE uri = :uri")
     suspend fun getPhotoByUri(uri: String): PhotoEntity?
 
-    @Query("SELECT * FROM photos WHERE isTextProcessed = 0 ORDER BY dateAdded ASC LIMIT 1")
+    @Query("SELECT * FROM photos WHERE isTextProcessed = 0 ORDER BY dateAdded DESC LIMIT 1")
     suspend fun getNextUnprocessed(): PhotoEntity?
 
     @Query("SELECT COUNT(*) FROM photos WHERE isTextProcessed = 0")

@@ -1,5 +1,6 @@
 package com.localphotos.app.ui.main
 
+import android.content.SharedPreferences
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
@@ -18,7 +19,8 @@ import kotlinx.coroutines.launch
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class MainViewModel(
-    private val repository: PhotoRepository
+    private val repository: PhotoRepository,
+    private val prefs: SharedPreferences
 ) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
@@ -30,18 +32,17 @@ class MainViewModel(
     private val _isProcessing = MutableStateFlow(false)
     val isProcessing: StateFlow<Boolean> = _isProcessing.asStateFlow()
 
-    private val _isGridView = MutableStateFlow(false)
+    private val _isGridView = MutableStateFlow(prefs.getBoolean("is_grid_view", true))
     val isGridView: StateFlow<Boolean> = _isGridView.asStateFlow()
 
-    val listPhotos: Flow<PagingData<PhotoListItem>> = _searchQuery
-        .flatMapLatest { query ->
-            repository.getAllPhotosPaged(query, true)
-        }.cachedIn(viewModelScope)
-
-    val gridPhotos: Flow<PagingData<PhotoListItem>> = _searchQuery
-        .flatMapLatest { query ->
-            repository.getAllPhotosGridPaged(query, true)
-        }.cachedIn(viewModelScope)
+    val photos: Flow<PagingData<PhotoListItem>> = combine(
+        _searchQuery, _isGridView
+    ) { query, isGrid -> query to isGrid }
+        .flatMapLatest { (query, isGrid) ->
+            if (isGrid) repository.getAllPhotosGridPaged(query, true)
+            else repository.getAllPhotosPaged(query, true)
+        }
+        .cachedIn(viewModelScope)
 
     private var processingJob: Job? = null
 
@@ -64,7 +65,9 @@ class MainViewModel(
     }
 
     fun toggleViewMode() {
-        _isGridView.value = !_isGridView.value
+        val newValue = !_isGridView.value
+        _isGridView.value = newValue
+        prefs.edit().putBoolean("is_grid_view", newValue).apply()
     }
 
     fun onResume() {
