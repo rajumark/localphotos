@@ -43,6 +43,7 @@ import com.localphotos.app.ui.category.CategoryScreen
 import com.localphotos.app.ui.detail.DetailScreen
 import com.localphotos.app.ui.documents.DocumentsScreen
 import com.localphotos.app.ui.faces.FacesScreen
+import com.localphotos.app.ui.labels.LabelDetailScreen
 import com.localphotos.app.ui.labels.LabelsScreen
 import com.localphotos.app.ui.main.MainScreen
 import com.localphotos.app.ui.theme.LocalPhotosTheme
@@ -175,7 +176,27 @@ fun AppNavigation() {
                 DocumentsScreen(onBack = { navController.popBackStack() })
             }
             composable(Screen.Labels.route) {
-                LabelsScreen(onBack = { navController.popBackStack() })
+                LabelsScreen(
+                    onBack = { navController.popBackStack() },
+                    onLabelClick = { label ->
+                        navController.navigate(Screen.LabelDetail.createRoute(label))
+                    }
+                )
+            }
+            composable(
+                route = Screen.LabelDetail.route,
+                arguments = listOf(navArgument("label") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val label = URLDecoder.decode(
+                    backStackEntry.arguments?.getString("label") ?: return@composable, "UTF-8"
+                )
+                LabelDetailScreen(
+                    label = label,
+                    onPhotoClick = { uri ->
+                        navController.navigate(Screen.Detail.createRoute(uri))
+                    },
+                    onBack = { navController.popBackStack() }
+                )
             }
             composable(
                 route = Screen.Detail.route,

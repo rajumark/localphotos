@@ -27,8 +27,10 @@ import kotlinx.coroutines.FlowPreview
 class MainViewModel(
     private val repository: PhotoRepository,
     private val prefs: SharedPreferences,
-    private val bucketId: String? = null
+    private val filter: GalleryFilter? = null
 ) : ViewModel() {
+    private val bucketId: String? get() = filter?.bucketId
+    private val label: String? get() = filter?.label
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
@@ -52,6 +54,7 @@ class MainViewModel(
     val selectedUris: StateFlow<Set<String>> = _selectedUris.asStateFlow()
 
     val isAlbum: Boolean get() = bucketId != null
+    val isLabelFilter: Boolean get() = label != null
 
     val photos: Flow<PagingData<PhotoListItem>> = combine(
         _searchQuery.debounce(300), _isGridView, _filterMode
@@ -63,9 +66,9 @@ class MainViewModel(
                 FilterMode.FAVORITES -> false to true
             }
             if (isGrid) {
-                repository.getPhotosGridPaged(query, filterTextOnly, favoritesOnly, bucketId)
+                repository.getPhotosGridPaged(query, filterTextOnly, favoritesOnly, bucketId, label)
             } else {
-                repository.getPhotosPaged(query, filterTextOnly, favoritesOnly, bucketId)
+                repository.getPhotosPaged(query, filterTextOnly, favoritesOnly, bucketId, label)
             }
         }
         .cachedIn(viewModelScope)

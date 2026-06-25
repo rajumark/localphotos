@@ -23,3 +23,9 @@ data class LabelWithCount(
     val label: String,
     val count: Int
 )
+
+data class LabelWithPhotos(
+    val label: String,
+    val count: Int,
+    val latestPhotoUris: List<String>
+)

@@ -127,6 +127,14 @@ interface PhotoDao {
     @Query("SELECT uri FROM photos WHERE bucketId = :bucketId ORDER BY dateAdded DESC LIMIT 4")
     suspend fun getLatestPhotoUrisForAlbum(bucketId: String): List<String>
 
+    @Query("""
+        SELECT pl.uri FROM photo_labels pl
+        INNER JOIN photos p ON pl.uri = p.uri
+        WHERE pl.label = :label
+        ORDER BY p.dateAdded DESC LIMIT 4
+    """)
+    suspend fun getLatestPhotoUrisForLabel(label: String): List<String>
+
     @Query("SELECT * FROM photos WHERE bucketId = :bucketId ORDER BY dateAdded DESC")
     fun getPhotosByBucketPaged(bucketId: String): PagingSource<Int, PhotoEntity>
 
@@ -144,7 +152,8 @@ interface PhotoDao {
             searchText: String,
             filterTextOnly: Boolean,
             favoritesOnly: Boolean = false,
-            bucketId: String? = null
+            bucketId: String? = null,
+            label: String? = null
         ): SupportSQLiteQuery {
             val conditions = mutableListOf<String>()
             if (favoritesOnly) {
@@ -163,6 +172,12 @@ interface PhotoDao {
             }
             if (!bucketId.isNullOrBlank()) {
                 conditions.add("photos.bucketId = '$bucketId'")
+            }
+            if (!label.isNullOrBlank()) {
+                val escapedLabel = label.replace("'", "''")
+                conditions.add(
+                    "photos.uri IN (SELECT uri FROM photo_labels WHERE label = '$escapedLabel')"
+                )
             }
             val whereClause = if (conditions.isNotEmpty()) {
                 "WHERE ${conditions.joinToString(" AND ")}"

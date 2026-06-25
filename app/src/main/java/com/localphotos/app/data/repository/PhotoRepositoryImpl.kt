@@ -14,6 +14,7 @@ import com.localphotos.app.data.local.PhotoDao
 import com.localphotos.app.data.local.entities.AlbumInfo
 import com.localphotos.app.data.local.entities.DeletedUriEntity
 import com.localphotos.app.data.local.entities.LabelWithCount
+import com.localphotos.app.data.local.entities.LabelWithPhotos
 import com.localphotos.app.data.local.entities.PhotoEntity
 import com.localphotos.app.data.local.entities.PhotoFtsEntity
 import com.localphotos.app.data.local.entities.PhotoLabelEntity
@@ -59,7 +60,7 @@ class PhotoRepositoryImpl(
             config = PagingConfig(pageSize = 30, initialLoadSize = 90, enablePlaceholders = true),
             pagingSourceFactory = {
                 if (searchText.isNotBlank()) {
-                    SearchPagingSource(searchText, false, true, null, photoDao)
+                    SearchPagingSource(searchText, false, true, null, null, photoDao)
                 } else {
                     photoDao.getFavoritePhotosPaged()
                 }
@@ -184,6 +185,17 @@ class PhotoRepositoryImpl(
     override fun getAllLabelsWithCount(): Flow<List<LabelWithCount>> =
         photoDao.getAllLabelsWithCount()
 
+    override fun getLabelWithPhotos(): Flow<List<LabelWithPhotos>> =
+        photoDao.getAllLabelsWithCount().map { labels ->
+            labels.map { label ->
+                LabelWithPhotos(
+                    label = label.label,
+                    count = label.count,
+                    latestPhotoUris = photoDao.getLatestPhotoUrisForLabel(label.label)
+                )
+            }
+        }
+
     override fun getLabelPendingCount(): Flow<Int> = photoDao.getLabelPendingCount()
 
     override suspend fun processOneLabel(): Boolean = withContext(Dispatchers.IO) {
@@ -225,9 +237,10 @@ class PhotoRepositoryImpl(
         searchText: String,
         filterTextOnly: Boolean,
         favoritesOnly: Boolean,
-        bucketId: String?
+        bucketId: String?,
+        label: String?
     ): Flow<PagingData<PhotoListItem>> {
-        return createPager(searchText, filterTextOnly, favoritesOnly, bucketId).flow.map { pagingData ->
+        return createPager(searchText, filterTextOnly, favoritesOnly, bucketId, label).flow.map { pagingData ->
             pagingData
                 .map<PhotoEntity, PhotoListItem> { PhotoListItem.Photo(it) }
                 .insertSeparators { before, after ->
@@ -248,9 +261,10 @@ class PhotoRepositoryImpl(
         searchText: String,
         filterTextOnly: Boolean,
         favoritesOnly: Boolean,
-        bucketId: String?
+        bucketId: String?,
+        label: String?
     ): Flow<PagingData<PhotoListItem>> {
-        return createPager(searchText, filterTextOnly, favoritesOnly, bucketId).flow.map { pagingData ->
+        return createPager(searchText, filterTextOnly, favoritesOnly, bucketId, label).flow.map { pagingData ->
             pagingData.map<PhotoEntity, PhotoListItem> { PhotoListItem.Photo(it) }
         }
     }
@@ -342,13 +356,14 @@ class PhotoRepositoryImpl(
         searchText: String,
         filterTextOnly: Boolean,
         favoritesOnly: Boolean,
-        bucketId: String? = null
+        bucketId: String? = null,
+        label: String? = null
     ): Pager<Int, PhotoEntity> {
         return Pager(
             config = PagingConfig(pageSize = 30, initialLoadSize = 90, enablePlaceholders = true),
             pagingSourceFactory = {
-                if (searchText.isNotBlank() || filterTextOnly || favoritesOnly || !bucketId.isNullOrBlank()) {
-                    SearchPagingSource(searchText, filterTextOnly, favoritesOnly, bucketId, photoDao)
+                if (searchText.isNotBlank() || filterTextOnly || favoritesOnly || !bucketId.isNullOrBlank() || !label.isNullOrBlank()) {
+                    SearchPagingSource(searchText, filterTextOnly, favoritesOnly, bucketId, label, photoDao)
                 } else {
                     photoDao.getAllPhotosPaged()
                 }
@@ -388,11 +403,12 @@ private class SearchPagingSource(
     private val filterTextOnly: Boolean,
     private val favoritesOnly: Boolean,
     private val bucketId: String?,
+    private val label: String?,
     private val photoDao: PhotoDao
 ) : PagingSource<Int, PhotoEntity>() {
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, PhotoEntity> {
         return try {
-            val query = PhotoDao.createSearchQuery(searchText, filterTextOnly, favoritesOnly, bucketId)
+            val query = PhotoDao.createSearchQuery(searchText, filterTextOnly, favoritesOnly, bucketId, label)
             photoDao.searchPhotosPaged(query).load(params)
         } catch (e: Exception) {
             LoadResult.Error(e)

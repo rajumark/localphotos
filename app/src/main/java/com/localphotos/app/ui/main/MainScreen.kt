@@ -72,8 +72,16 @@ fun MainScreen(
     modifier: Modifier = Modifier,
     title: String = "LocalPhotos",
     bucketId: String? = null,
+    label: String? = null,
     onBack: (() -> Unit)? = null,
-    viewModel: MainViewModel = koinViewModel { if (bucketId != null) parametersOf(bucketId) else parametersOf() }
+    viewModel: MainViewModel = koinViewModel {
+        val filter = when {
+            bucketId != null -> GalleryFilter(bucketId = bucketId)
+            label != null -> GalleryFilter(label = label)
+            else -> null
+        }
+        parametersOf(filter)
+    }
 ) {
     val searchQuery by viewModel.searchQuery.collectAsState()
     val pendingCount by viewModel.pendingCount.collectAsState()
@@ -136,7 +144,7 @@ fun MainScreen(
                 isGridView = isGridView,
                 onToggleViewMode = viewModel::toggleViewMode,
                 title = title,
-                onBack = if (viewModel.isAlbum) onBack else null
+                onBack = if (viewModel.isAlbum || viewModel.isLabelFilter) onBack else null
             )
         }
 

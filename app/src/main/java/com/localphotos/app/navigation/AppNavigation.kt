@@ -25,6 +25,10 @@ sealed class Screen(val route: String) {
         fun createRoute(bucketId: String, albumName: String) =
             "album_detail/${java.net.URLEncoder.encode(bucketId, "UTF-8")}/${java.net.URLEncoder.encode(albumName, "UTF-8")}"
     }
+    data object LabelDetail : Screen("label_detail/{label}") {
+        fun createRoute(label: String) =
+            "label_detail/${java.net.URLEncoder.encode(label, "UTF-8")}"
+    }
 }
 
 data class BottomNavItem(
@@ -58,6 +62,6 @@ data class CategoryItem(
 val categoryItems = listOf(
     CategoryItem("Albums", Screen.Albums.route, Icons.Filled.PhotoAlbum),
     CategoryItem("Faces", Screen.Faces.route, Icons.Filled.Face),
-    CategoryItem("Documents", Screen.Documents.route, Icons.Filled.Description),
+    CategoryItem("Documents", Screen.LabelDetail.createRoute("Paper"), Icons.Filled.Description),
     CategoryItem("Labels", Screen.Labels.route, Icons.AutoMirrored.Filled.Label)
 )
