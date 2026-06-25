@@ -16,7 +16,7 @@ sealed class Screen(val route: String) {
     data object Category : Screen("category")
     data object Albums : Screen("albums")
     data object Faces : Screen("faces")
-    data object Documents : Screen("documents")
+
     data object Labels : Screen("labels")
     data object Detail : Screen("detail/{uri}") {
         fun createRoute(uri: String) = "detail/${java.net.URLEncoder.encode(uri, "UTF-8")}"
