@@ -80,6 +80,9 @@ dependencies {
     // ML Kit Text Recognition
     implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.1")
 
+    // ML Kit Image Labeling
+    implementation("com.google.mlkit:image-labeling:17.0.9")
+
     // Koin
     implementation("io.insert-koin:koin-android:3.5.6")
     implementation("io.insert-koin:koin-androidx-compose:3.5.6")

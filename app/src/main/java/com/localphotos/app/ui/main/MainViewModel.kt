@@ -10,6 +10,7 @@ import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import com.localphotos.app.data.local.entities.PhotoListItem
 import com.localphotos.app.data.repository.PhotoRepository
+import com.localphotos.app.ui.components.FilterMode
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -25,7 +26,8 @@ import kotlinx.coroutines.FlowPreview
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class, FlowPreview::class)
 class MainViewModel(
     private val repository: PhotoRepository,
-    private val prefs: SharedPreferences
+    private val prefs: SharedPreferences,
+    private val bucketId: String? = null
 ) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
@@ -34,28 +36,36 @@ class MainViewModel(
     private val _pendingCount = MutableStateFlow(0)
     val pendingCount: StateFlow<Int> = _pendingCount.asStateFlow()
 
+    private val _labelPendingCount = MutableStateFlow(0)
+    val labelPendingCount: StateFlow<Int> = _labelPendingCount.asStateFlow()
+
     private val _isProcessing = MutableStateFlow(false)
     val isProcessing: StateFlow<Boolean> = _isProcessing.asStateFlow()
 
     private val _isGridView = MutableStateFlow(prefs.getBoolean("is_grid_view", true))
     val isGridView: StateFlow<Boolean> = _isGridView.asStateFlow()
 
-    private val _showFavorites = MutableStateFlow(false)
-    val showFavorites: StateFlow<Boolean> = _showFavorites.asStateFlow()
+    private val _filterMode = MutableStateFlow(FilterMode.ALL)
+    val filterMode: StateFlow<FilterMode> = _filterMode.asStateFlow()
 
     private val _selectedUris = MutableStateFlow<Set<String>>(emptySet())
     val selectedUris: StateFlow<Set<String>> = _selectedUris.asStateFlow()
 
+    val isAlbum: Boolean get() = bucketId != null
+
     val photos: Flow<PagingData<PhotoListItem>> = combine(
-        _searchQuery.debounce(300), _isGridView, _showFavorites
-    ) { query, isGrid, showFav -> Triple(query, isGrid, showFav) }
-        .flatMapLatest { (query, isGrid, showFav) ->
-            if (showFav) {
-                if (isGrid) repository.getAllPhotosGridPaged(query, true)
-                else repository.getFavoritePhotosPaged(query)
+        _searchQuery.debounce(300), _isGridView, _filterMode
+    ) { query, isGrid, mode -> Triple(query, isGrid, mode) }
+        .flatMapLatest { (query, isGrid, mode) ->
+            val (filterTextOnly, favoritesOnly) = when (mode) {
+                FilterMode.ALL -> false to false
+                FilterMode.TEXT_ONLY -> true to false
+                FilterMode.FAVORITES -> false to true
+            }
+            if (isGrid) {
+                repository.getPhotosGridPaged(query, filterTextOnly, favoritesOnly, bucketId)
             } else {
-                if (isGrid) repository.getAllPhotosGridPaged(query, true)
-                else repository.getAllPhotosPaged(query, true)
+                repository.getPhotosPaged(query, filterTextOnly, favoritesOnly, bucketId)
             }
         }
         .cachedIn(viewModelScope)
@@ -67,6 +77,14 @@ class MainViewModel(
             repository.getPendingCount().collect { count ->
                 _pendingCount.value = count
                 if (count > 0 && processingJob == null) {
+                    startProcessing()
+                }
+            }
+        }
+        viewModelScope.launch {
+            repository.getLabelPendingCount().collect { count ->
+                _labelPendingCount.value = count
+                if (_pendingCount.value == 0 && count > 0 && processingJob == null) {
                     startProcessing()
                 }
             }
@@ -86,8 +104,8 @@ class MainViewModel(
         prefs.edit().putBoolean("is_grid_view", newValue).apply()
     }
 
-    fun setShowFavorites(show: Boolean) {
-        _showFavorites.value = show
+    fun setFilterMode(mode: FilterMode) {
+        _filterMode.value = mode
     }
 
     fun toggleSelection(uri: String) {
@@ -135,7 +153,7 @@ class MainViewModel(
 
     private suspend fun refreshAndProcess() {
         repository.refreshPhotos()
-        if (_pendingCount.value > 0) startProcessing()
+        if (_pendingCount.value > 0 || _labelPendingCount.value > 0) startProcessing()
     }
 
     private fun startProcessing() {
@@ -144,6 +162,11 @@ class MainViewModel(
             _isProcessing.value = true
             while (true) {
                 val hasMore = repository.processOne()
+                if (!hasMore) break
+                delay(100)
+            }
+            while (true) {
+                val hasMore = repository.processOneLabel()
                 if (!hasMore) break
                 delay(100)
             }

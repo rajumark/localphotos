@@ -35,8 +35,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -62,21 +60,27 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.localphotos.app.data.local.entities.PhotoListItem
-import com.localphotos.app.ui.components.PhotoSearchBar
+import com.localphotos.app.ui.components.FilterMode
+import com.localphotos.app.ui.components.MainTopBar
 import org.koin.androidx.compose.koinViewModel
+import org.koin.core.parameter.parametersOf
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun MainScreen(
     onPhotoClick: (String) -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: MainViewModel = koinViewModel()
+    title: String = "LocalPhotos",
+    bucketId: String? = null,
+    onBack: (() -> Unit)? = null,
+    viewModel: MainViewModel = koinViewModel { if (bucketId != null) parametersOf(bucketId) else parametersOf() }
 ) {
     val searchQuery by viewModel.searchQuery.collectAsState()
     val pendingCount by viewModel.pendingCount.collectAsState()
+    val labelPendingCount by viewModel.labelPendingCount.collectAsState()
     val isProcessing by viewModel.isProcessing.collectAsState()
     val isGridView by viewModel.isGridView.collectAsState()
-    val showFavorites by viewModel.showFavorites.collectAsState()
+    val filterMode by viewModel.filterMode.collectAsState()
     val selectedUris by viewModel.selectedUris.collectAsState()
     val context = LocalContext.current
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -88,7 +92,7 @@ fun MainScreen(
         viewModel.clearSelection()
     }
 
-    LaunchedEffect(searchQuery) {
+    LaunchedEffect(searchQuery, filterMode) {
         if (currentItems.itemCount > 0) {
             listState.scrollToItem(0)
         }
@@ -124,57 +128,26 @@ fun MainScreen(
                 }
             }
         } else {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(end = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                PhotoSearchBar(
-                    query = searchQuery,
-                    onQueryChange = viewModel::onSearchQueryChange,
-                    placeholder = "Search photos by text\u2026",
-                    modifier = Modifier.weight(1f)
-                )
-                IconButton(onClick = { viewModel.toggleViewMode() }) {
-                    Icon(
-                        if (isGridView) Icons.AutoMirrored.Filled.ViewList else Icons.Filled.GridView,
-                        contentDescription = if (isGridView) "List view" else "Grid view",
-                        tint = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-            }
+            MainTopBar(
+                searchQuery = searchQuery,
+                onSearchQueryChange = viewModel::onSearchQueryChange,
+                filterMode = filterMode,
+                onFilterModeChange = viewModel::setFilterMode,
+                isGridView = isGridView,
+                onToggleViewMode = viewModel::toggleViewMode,
+                title = title,
+                onBack = if (viewModel.isAlbum) onBack else null
+            )
         }
 
-        if (selectedUris.isEmpty()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                FilterChip(
-                    selected = !showFavorites,
-                    onClick = { viewModel.setShowFavorites(false) },
-                    label = { Text("Photos") },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer
-                    )
-                )
-                FilterChip(
-                    selected = showFavorites,
-                    onClick = { viewModel.setShowFavorites(true) },
-                    label = { Text("Favorites") },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer
-                    )
-                )
+        if (isProcessing) {
+            val status = when {
+                pendingCount > 0 -> "OCR: $pendingCount remaining"
+                labelPendingCount > 0 -> "Labeling: $labelPendingCount remaining"
+                else -> "Processing\u2026"
             }
-        }
-
-        if (pendingCount > 0 && isProcessing) {
             Text(
-                text = "Processing: $pendingCount remaining",
+                text = status,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier

@@ -21,6 +21,10 @@ sealed class Screen(val route: String) {
     data object Detail : Screen("detail/{uri}") {
         fun createRoute(uri: String) = "detail/${java.net.URLEncoder.encode(uri, "UTF-8")}"
     }
+    data object AlbumDetail : Screen("album_detail/{bucketId}/{albumName}") {
+        fun createRoute(bucketId: String, albumName: String) =
+            "album_detail/${java.net.URLEncoder.encode(bucketId, "UTF-8")}/${java.net.URLEncoder.encode(albumName, "UTF-8")}"
+    }
 }
 
 data class BottomNavItem(

@@ -9,9 +9,12 @@ import androidx.room.RawQuery
 import androidx.room.Update
 import androidx.sqlite.db.SimpleSQLiteQuery
 import androidx.sqlite.db.SupportSQLiteQuery
+import com.localphotos.app.data.local.entities.AlbumSummary
 import com.localphotos.app.data.local.entities.DeletedUriEntity
+import com.localphotos.app.data.local.entities.LabelWithCount
 import com.localphotos.app.data.local.entities.PhotoEntity
 import com.localphotos.app.data.local.entities.PhotoFtsEntity
+import com.localphotos.app.data.local.entities.PhotoLabelEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -46,6 +49,9 @@ interface PhotoDao {
 
     @Query("DELETE FROM photos_fts WHERE uri = :uri")
     suspend fun deleteFts(uri: String)
+
+    @Query("DELETE FROM photo_labels WHERE uri = :uri")
+    suspend fun deleteLabels(uri: String)
 
     @Query("DELETE FROM photos WHERE uri NOT IN (:uris)")
     suspend fun deletePhotosNotIn(uris: List<String>)
@@ -86,11 +92,56 @@ interface PhotoDao {
     @Query("UPDATE photos SET isTextProcessed = 1, text = :text WHERE uri = :uri")
     suspend fun markProcessed(uri: String, text: String)
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertPhotoLabel(label: PhotoLabelEntity)
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertPhotoLabels(labels: List<PhotoLabelEntity>)
+
+    @Query("DELETE FROM photo_labels WHERE uri = :uri")
+    suspend fun deletePhotoLabels(uri: String)
+
+    @Query("SELECT label, COUNT(*) as count FROM photo_labels GROUP BY label ORDER BY count DESC")
+    fun getAllLabelsWithCount(): Flow<List<LabelWithCount>>
+
+    @Query("SELECT * FROM photos WHERE isTextProcessed = 1 AND isLabelProcessed = 0 ORDER BY dateAdded DESC LIMIT 1")
+    suspend fun getNextUnlabeled(): PhotoEntity?
+
+    @Query("SELECT COUNT(*) FROM photos WHERE isTextProcessed = 1 AND isLabelProcessed = 0")
+    fun getLabelPendingCount(): Flow<Int>
+
+    @Query("UPDATE photos SET isLabelProcessed = 1 WHERE uri = :uri")
+    suspend fun markLabelProcessed(uri: String)
+
+    @Query("""
+        SELECT bucketId, bucketDisplayName, COUNT(*) as photoCount
+        FROM photos WHERE bucketId != ''
+        GROUP BY bucketId
+        ORDER BY MAX(dateAdded) DESC
+    """)
+    fun getAlbums(): Flow<List<AlbumSummary>>
+
+    @Query("SELECT uri FROM photos WHERE bucketId = :bucketId ORDER BY dateAdded DESC LIMIT 4")
+    suspend fun getLatestPhotoUrisForAlbum(bucketId: String): List<String>
+
+    @Query("SELECT * FROM photos WHERE bucketId = :bucketId ORDER BY dateAdded DESC")
+    fun getPhotosByBucketPaged(bucketId: String): PagingSource<Int, PhotoEntity>
+
+    @Query("SELECT * FROM photos WHERE bucketId = :bucketId AND isFavorite = 1 ORDER BY dateAdded DESC")
+    fun getFavoritePhotosByBucketPaged(bucketId: String): PagingSource<Int, PhotoEntity>
+
+    @Query("SELECT bucketId FROM photos WHERE bucketId != '' GROUP BY bucketId")
+    suspend fun getAllBucketIds(): List<String>
+
+    @Query("SELECT bucketDisplayName FROM photos WHERE bucketId = :bucketId LIMIT 1")
+    suspend fun getBucketDisplayName(bucketId: String): String?
+
     companion object {
         fun createSearchQuery(
             searchText: String,
             filterTextOnly: Boolean,
-            favoritesOnly: Boolean = false
+            favoritesOnly: Boolean = false,
+            bucketId: String? = null
         ): SupportSQLiteQuery {
             val conditions = mutableListOf<String>()
             if (favoritesOnly) {
@@ -106,6 +157,9 @@ interface PhotoDao {
             }
             if (filterTextOnly) {
                 conditions.add("photos.text != ''")
+            }
+            if (!bucketId.isNullOrBlank()) {
+                conditions.add("photos.bucketId = '$bucketId'")
             }
             val whereClause = if (conditions.isNotEmpty()) {
                 "WHERE ${conditions.joinToString(" AND ")}"

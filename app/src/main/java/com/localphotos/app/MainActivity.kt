@@ -38,6 +38,7 @@ import androidx.navigation.navArgument
 import com.localphotos.app.navigation.Screen
 import com.localphotos.app.navigation.bottomNavItems
 import com.localphotos.app.ui.albums.AlbumsScreen
+import com.localphotos.app.ui.album.AlbumDetailScreen
 import com.localphotos.app.ui.category.CategoryScreen
 import com.localphotos.app.ui.detail.DetailScreen
 import com.localphotos.app.ui.documents.DocumentsScreen
@@ -160,7 +161,12 @@ fun AppNavigation() {
                 })
             }
             composable(Screen.Albums.route) {
-                AlbumsScreen(onBack = { navController.popBackStack() })
+                AlbumsScreen(
+                    onAlbumClick = { bucketId, albumName ->
+                        navController.navigate(Screen.AlbumDetail.createRoute(bucketId, albumName))
+                    },
+                    onBack = { navController.popBackStack() }
+                )
             }
             composable(Screen.Faces.route) {
                 FacesScreen(onBack = { navController.popBackStack() })
@@ -179,6 +185,28 @@ fun AppNavigation() {
                 val uri = URLDecoder.decode(encodedUri, "UTF-8")
                 DetailScreen(
                     uri = uri,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable(
+                route = Screen.AlbumDetail.route,
+                arguments = listOf(
+                    navArgument("bucketId") { type = NavType.StringType },
+                    navArgument("albumName") { type = NavType.StringType }
+                )
+            ) { backStackEntry ->
+                val bucketId = URLDecoder.decode(
+                    backStackEntry.arguments?.getString("bucketId") ?: return@composable, "UTF-8"
+                )
+                val albumName = URLDecoder.decode(
+                    backStackEntry.arguments?.getString("albumName") ?: return@composable, "UTF-8"
+                )
+                AlbumDetailScreen(
+                    bucketId = bucketId,
+                    albumName = albumName,
+                    onPhotoClick = { uri ->
+                        navController.navigate(Screen.Detail.createRoute(uri))
+                    },
                     onBack = { navController.popBackStack() }
                 )
             }

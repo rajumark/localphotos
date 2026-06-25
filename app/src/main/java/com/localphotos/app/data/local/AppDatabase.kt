@@ -5,10 +5,11 @@ import androidx.room.RoomDatabase
 import com.localphotos.app.data.local.entities.DeletedUriEntity
 import com.localphotos.app.data.local.entities.PhotoEntity
 import com.localphotos.app.data.local.entities.PhotoFtsEntity
+import com.localphotos.app.data.local.entities.PhotoLabelEntity
 
 @Database(
-    entities = [PhotoEntity::class, PhotoFtsEntity::class, DeletedUriEntity::class],
-    version = 3,
+    entities = [PhotoEntity::class, PhotoFtsEntity::class, DeletedUriEntity::class, PhotoLabelEntity::class],
+    version = 5,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

@@ -1,14 +1,19 @@
 package com.localphotos.app.data.repository
 
 import androidx.paging.PagingData
+import androidx.paging.PagingSource
+import com.localphotos.app.data.local.entities.AlbumInfo
+import com.localphotos.app.data.local.entities.LabelWithCount
 import com.localphotos.app.data.local.entities.PhotoEntity
 import com.localphotos.app.data.local.entities.PhotoListItem
 import kotlinx.coroutines.flow.Flow
 
 interface PhotoRepository {
     fun getAllPhotosPaged(searchText: String = "", filterTextOnly: Boolean = false): Flow<PagingData<PhotoListItem>>
-    fun getAllPhotosGridPaged(searchText: String = "", filterTextOnly: Boolean = false): Flow<PagingData<PhotoListItem>>
+    fun getAllPhotosGridPaged(searchText: String = "", filterTextOnly: Boolean = false, favoritesOnly: Boolean = false): Flow<PagingData<PhotoListItem>>
     fun getFavoritePhotosPaged(searchText: String = ""): Flow<PagingData<PhotoListItem>>
+    fun getPhotosPaged(searchText: String = "", filterTextOnly: Boolean = false, favoritesOnly: Boolean = false, bucketId: String? = null): Flow<PagingData<PhotoListItem>>
+    fun getPhotosGridPaged(searchText: String = "", filterTextOnly: Boolean = false, favoritesOnly: Boolean = false, bucketId: String? = null): Flow<PagingData<PhotoListItem>>
     fun getPendingCount(): Flow<Int>
     val favoriteCount: Flow<Int>
     suspend fun getPhotoByUri(uri: String): PhotoEntity?
@@ -16,4 +21,10 @@ interface PhotoRepository {
     suspend fun deletePhoto(uri: String)
     suspend fun refreshPhotos()
     suspend fun processOne(): Boolean
+    suspend fun processOneLabel(): Boolean
+    fun getAllLabelsWithCount(): Flow<List<LabelWithCount>>
+    fun getLabelPendingCount(): Flow<Int>
+    fun getAlbums(): Flow<List<AlbumInfo>>
+    fun getPhotosByBucketPaged(bucketId: String): Flow<PagingData<PhotoListItem>>
+    fun getFavoritePhotosByBucketPaged(bucketId: String): PagingSource<Int, PhotoEntity>
 }

@@ -11,6 +11,9 @@ data class PhotoEntity(
     val thumbnailPath: String = "",
     val isFavorite: Boolean = false,
     val isTextProcessed: Boolean = false,
+    val isLabelProcessed: Boolean = false,
+    val bucketId: String = "",
+    val bucketDisplayName: String = "",
     val dateAdded: Long = System.currentTimeMillis(),
     val dateModified: Long = System.currentTimeMillis()
 )
