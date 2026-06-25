@@ -1,5 +1,8 @@
 package com.localphotos.app.ui.main
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.content.SharedPreferences
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -35,6 +38,9 @@ class MainViewModel(
     private val _isGridView = MutableStateFlow(prefs.getBoolean("is_grid_view", true))
     val isGridView: StateFlow<Boolean> = _isGridView.asStateFlow()
 
+    private val _selectedUris = MutableStateFlow<Set<String>>(emptySet())
+    val selectedUris: StateFlow<Set<String>> = _selectedUris.asStateFlow()
+
     val photos: Flow<PagingData<PhotoListItem>> = combine(
         _searchQuery, _isGridView
     ) { query, isGrid -> query to isGrid }
@@ -68,6 +74,42 @@ class MainViewModel(
         val newValue = !_isGridView.value
         _isGridView.value = newValue
         prefs.edit().putBoolean("is_grid_view", newValue).apply()
+    }
+
+    fun toggleSelection(uri: String) {
+        val current = _selectedUris.value.toMutableSet()
+        if (current.contains(uri)) current.remove(uri) else current.add(uri)
+        _selectedUris.value = current
+    }
+
+    fun clearSelection() {
+        _selectedUris.value = emptySet()
+    }
+
+    fun deleteSelected() {
+        viewModelScope.launch {
+            _selectedUris.value.forEach { repository.deletePhoto(it) }
+            _selectedUris.value = emptySet()
+        }
+    }
+
+    fun shareSelected(context: Context) {
+        val uris = _selectedUris.value.toList()
+        if (uris.isEmpty()) return
+        val intent = if (uris.size == 1) {
+            Intent(Intent.ACTION_SEND).apply {
+                type = "image/*"
+                putExtra(Intent.EXTRA_STREAM, Uri.parse(uris[0]))
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        } else {
+            Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+                type = "image/*"
+                putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris.map { Uri.parse(it) }))
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        }
+        context.startActivity(Intent.createChooser(intent, "Share photos"))
     }
 
     fun onResume() {
