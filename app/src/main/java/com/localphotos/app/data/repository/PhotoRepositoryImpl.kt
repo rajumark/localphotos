@@ -13,12 +13,15 @@ import androidx.paging.map
 import com.localphotos.app.data.local.PhotoDao
 import com.localphotos.app.data.local.entities.AlbumInfo
 import com.localphotos.app.data.local.entities.DeletedUriEntity
+import com.localphotos.app.data.local.entities.FaceCountFilter
+import com.localphotos.app.data.local.entities.FaceEntity
 import com.localphotos.app.data.local.entities.LabelWithCount
 import com.localphotos.app.data.local.entities.LabelWithPhotos
 import com.localphotos.app.data.local.entities.PhotoEntity
 import com.localphotos.app.data.local.entities.PhotoFtsEntity
 import com.localphotos.app.data.local.entities.PhotoLabelEntity
 import com.localphotos.app.data.local.entities.PhotoListItem
+import com.localphotos.app.faceprocessing.FaceProcessor
 import com.localphotos.app.labeling.LabelProcessor
 import com.localphotos.app.ocr.OCRProcessor
 import kotlinx.coroutines.Dispatchers
@@ -31,7 +34,8 @@ class PhotoRepositoryImpl(
     private val context: Context,
     private val photoDao: PhotoDao,
     private val ocrProcessor: OCRProcessor,
-    private val labelProcessor: LabelProcessor
+    private val labelProcessor: LabelProcessor,
+    private val faceProcessor: FaceProcessor
 ) : PhotoRepository {
 
     override fun getAllPhotosPaged(
@@ -96,6 +100,7 @@ class PhotoRepositoryImpl(
         photoDao.insertDeletedUri(DeletedUriEntity(uri))
         photoDao.deleteFts(uri)
         photoDao.deleteLabels(uri)
+        photoDao.deleteFacesByUri(uri)
         photoDao.deletePhoto(uri)
     }
 
@@ -209,6 +214,39 @@ class PhotoRepositoryImpl(
         }
         photoDao.markLabelProcessed(photo.uri)
         true
+    }
+
+    override fun getFacePendingCount(): Flow<Int> = photoDao.getFacePendingCount()
+
+    override suspend fun processOneFace(): Boolean = withContext(Dispatchers.IO) {
+        val photo = photoDao.getNextUnfaced() ?: return@withContext false
+        val uri = Uri.parse(photo.uri)
+        val result = faceProcessor.detectFacesFromUri(uri)
+        if (result.faces.isNotEmpty()) {
+            val faces = result.faces.mapIndexed { index, rect ->
+                FaceEntity(
+                    uri = photo.uri,
+                    faceIndex = index,
+                    left = rect.left,
+                    top = rect.top,
+                    right = rect.right,
+                    bottom = rect.bottom
+                )
+            }
+            photoDao.insertFaces(faces)
+        }
+        photoDao.markFaceProcessed(photo.uri, result.faces.size)
+        true
+    }
+
+    override fun getFacePhotosPaged(filter: FaceCountFilter): Flow<PagingData<PhotoEntity>> {
+        return Pager(
+            config = PagingConfig(pageSize = 30, initialLoadSize = 90, enablePlaceholders = true),
+            pagingSourceFactory = {
+                val query = PhotoDao.createFaceQuery(filter)
+                photoDao.searchPhotosPaged(query)
+            }
+        ).flow
     }
 
     override fun getAlbums(): Flow<List<AlbumInfo>> {

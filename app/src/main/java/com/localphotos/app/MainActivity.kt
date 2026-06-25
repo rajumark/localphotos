@@ -41,7 +41,7 @@ import com.localphotos.app.ui.albums.AlbumsScreen
 import com.localphotos.app.ui.album.AlbumDetailScreen
 import com.localphotos.app.ui.category.CategoryScreen
 import com.localphotos.app.ui.detail.DetailScreen
-import com.localphotos.app.ui.faces.FacesScreen
+import com.localphotos.app.ui.faces.FaceGridScreen
 import com.localphotos.app.ui.labels.LabelDetailScreen
 import com.localphotos.app.ui.labels.LabelsScreen
 import com.localphotos.app.ui.main.MainScreen
@@ -169,7 +169,12 @@ fun AppNavigation() {
                 )
             }
             composable(Screen.Faces.route) {
-                FacesScreen(onBack = { navController.popBackStack() })
+                FaceGridScreen(
+                    onPhotoClick = { uri ->
+                        navController.navigate(Screen.Detail.createRoute(uri))
+                    },
+                    onBack = { navController.popBackStack() }
+                )
             }
             composable(Screen.Labels.route) {
                 LabelsScreen(

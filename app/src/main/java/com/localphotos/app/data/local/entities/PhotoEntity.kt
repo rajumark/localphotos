@@ -12,6 +12,8 @@ data class PhotoEntity(
     val isFavorite: Boolean = false,
     val isTextProcessed: Boolean = false,
     val isLabelProcessed: Boolean = false,
+    val isFaceProcessed: Boolean = false,
+    val faceCount: Int = 0,
     val bucketId: String = "",
     val bucketDisplayName: String = "",
     val dateAdded: Long = System.currentTimeMillis(),

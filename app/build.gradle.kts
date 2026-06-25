@@ -83,6 +83,9 @@ dependencies {
     // ML Kit Image Labeling
     implementation("com.google.mlkit:image-labeling:17.0.9")
 
+    // ML Kit Face Detection
+    implementation("com.google.mlkit:face-detection:16.1.7")
+
     // Koin
     implementation("io.insert-koin:koin-android:3.5.6")
     implementation("io.insert-koin:koin-androidx-compose:3.5.6")

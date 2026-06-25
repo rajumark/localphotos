@@ -86,6 +86,7 @@ fun MainScreen(
     val searchQuery by viewModel.searchQuery.collectAsState()
     val pendingCount by viewModel.pendingCount.collectAsState()
     val labelPendingCount by viewModel.labelPendingCount.collectAsState()
+    val facePendingCount by viewModel.facePendingCount.collectAsState()
     val isProcessing by viewModel.isProcessing.collectAsState()
     val isGridView by viewModel.isGridView.collectAsState()
     val filterMode by viewModel.filterMode.collectAsState()
@@ -149,7 +150,7 @@ fun MainScreen(
         }
 
         if (isProcessing) {
-            val total = pendingCount + labelPendingCount
+            val total = pendingCount + labelPendingCount + facePendingCount
             Text(
                 text = "${total} scanning\u2026",
                 style = MaterialTheme.typography.labelSmall,

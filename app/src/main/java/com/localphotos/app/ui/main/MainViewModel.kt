@@ -41,6 +41,9 @@ class MainViewModel(
     private val _labelPendingCount = MutableStateFlow(0)
     val labelPendingCount: StateFlow<Int> = _labelPendingCount.asStateFlow()
 
+    private val _facePendingCount = MutableStateFlow(0)
+    val facePendingCount: StateFlow<Int> = _facePendingCount.asStateFlow()
+
     private val _isProcessing = MutableStateFlow(false)
     val isProcessing: StateFlow<Boolean> = _isProcessing.asStateFlow()
 
@@ -49,6 +52,8 @@ class MainViewModel(
 
     private val _filterMode = MutableStateFlow(FilterMode.ALL)
     val filterMode: StateFlow<FilterMode> = _filterMode.asStateFlow()
+
+    val totalFacePendingCount: StateFlow<Int> = _facePendingCount.asStateFlow()
 
     private val _selectedUris = MutableStateFlow<Set<String>>(emptySet())
     val selectedUris: StateFlow<Set<String>> = _selectedUris.asStateFlow()
@@ -88,6 +93,14 @@ class MainViewModel(
             repository.getLabelPendingCount().collect { count ->
                 _labelPendingCount.value = count
                 if (_pendingCount.value == 0 && count > 0 && processingJob == null) {
+                    startProcessing()
+                }
+            }
+        }
+        viewModelScope.launch {
+            repository.getFacePendingCount().collect { count ->
+                _facePendingCount.value = count
+                if (_pendingCount.value == 0 && _labelPendingCount.value == 0 && count > 0 && processingJob == null) {
                     startProcessing()
                 }
             }
@@ -170,6 +183,11 @@ class MainViewModel(
             }
             while (true) {
                 val hasMore = repository.processOneLabel()
+                if (!hasMore) break
+                delay(100)
+            }
+            while (true) {
+                val hasMore = repository.processOneFace()
                 if (!hasMore) break
                 delay(100)
             }

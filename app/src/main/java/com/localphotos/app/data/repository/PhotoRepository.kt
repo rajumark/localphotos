@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.paging.PagingData
 import androidx.paging.PagingSource
 import com.localphotos.app.data.local.entities.AlbumInfo
+import com.localphotos.app.data.local.entities.FaceCountFilter
 import com.localphotos.app.data.local.entities.LabelWithCount
 import com.localphotos.app.data.local.entities.LabelWithPhotos
 import com.localphotos.app.data.local.entities.PhotoEntity
@@ -24,6 +25,9 @@ interface PhotoRepository {
     suspend fun refreshPhotos()
     suspend fun processOne(): Boolean
     suspend fun processOneLabel(): Boolean
+    suspend fun processOneFace(): Boolean
+    fun getFacePendingCount(): Flow<Int>
+    fun getFacePhotosPaged(filter: FaceCountFilter): Flow<PagingData<PhotoEntity>>
     fun getAllLabelsWithCount(): Flow<List<LabelWithCount>>
     fun getLabelPendingCount(): Flow<Int>
     fun getAlbums(): Flow<List<AlbumInfo>>

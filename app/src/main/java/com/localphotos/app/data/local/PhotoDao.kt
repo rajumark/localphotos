@@ -11,6 +11,8 @@ import androidx.sqlite.db.SimpleSQLiteQuery
 import androidx.sqlite.db.SupportSQLiteQuery
 import com.localphotos.app.data.local.entities.AlbumSummary
 import com.localphotos.app.data.local.entities.DeletedUriEntity
+import com.localphotos.app.data.local.entities.FaceCountFilter
+import com.localphotos.app.data.local.entities.FaceEntity
 import com.localphotos.app.data.local.entities.LabelWithCount
 import com.localphotos.app.data.local.entities.PhotoEntity
 import com.localphotos.app.data.local.entities.PhotoFtsEntity
@@ -104,6 +106,9 @@ interface PhotoDao {
     @Query("DELETE FROM photo_labels WHERE uri = :uri")
     suspend fun deletePhotoLabels(uri: String)
 
+    @Query("DELETE FROM faces WHERE uri = :uri")
+    suspend fun deleteFacesByUri(uri: String)
+
     @Query("SELECT label, COUNT(*) as count FROM photo_labels GROUP BY label ORDER BY count DESC")
     fun getAllLabelsWithCount(): Flow<List<LabelWithCount>>
 
@@ -115,6 +120,18 @@ interface PhotoDao {
 
     @Query("UPDATE photos SET isLabelProcessed = 1 WHERE uri = :uri")
     suspend fun markLabelProcessed(uri: String)
+
+    @Query("SELECT * FROM photos WHERE isLabelProcessed = 1 AND isFaceProcessed = 0 ORDER BY dateAdded DESC LIMIT 1")
+    suspend fun getNextUnfaced(): PhotoEntity?
+
+    @Query("SELECT COUNT(*) FROM photos WHERE isLabelProcessed = 1 AND isFaceProcessed = 0")
+    fun getFacePendingCount(): Flow<Int>
+
+    @Query("UPDATE photos SET isFaceProcessed = 1, faceCount = :faceCount WHERE uri = :uri")
+    suspend fun markFaceProcessed(uri: String, faceCount: Int)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertFaces(faces: List<FaceEntity>)
 
     @Query("""
         SELECT bucketId, bucketDisplayName, COUNT(*) as photoCount
@@ -148,6 +165,20 @@ interface PhotoDao {
     suspend fun getBucketDisplayName(bucketId: String): String?
 
     companion object {
+        fun createFaceQuery(filter: FaceCountFilter): SupportSQLiteQuery {
+            val condition = when (filter) {
+                FaceCountFilter.ALL -> "faceCount > 0"
+                FaceCountFilter.ONE -> "faceCount = 1"
+                FaceCountFilter.TWO -> "faceCount = 2"
+                FaceCountFilter.THREE -> "faceCount = 3"
+                FaceCountFilter.FOUR -> "faceCount = 4"
+                FaceCountFilter.GROUP -> "faceCount > 4"
+                FaceCountFilter.NO_FACE -> "faceCount = 0"
+            }
+            val sql = "SELECT * FROM photos WHERE $condition ORDER BY dateAdded DESC"
+            return SimpleSQLiteQuery(sql)
+        }
+
         fun createSearchQuery(
             searchText: String,
             filterTextOnly: Boolean,
