@@ -27,8 +27,11 @@ import com.localphotos.app.navigation.categoryItems
 @Composable
 fun CategoryScreen(
     onTileClick: (String) -> Unit,
+    showDbInfo: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val items = if (showDbInfo) categoryItems else categoryItems.filter { it.route != "dbinfo" }
+
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
         modifier = modifier
@@ -38,7 +41,7 @@ fun CategoryScreen(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        items(categoryItems) { item ->
+        items(items) { item ->
             Card(
                 modifier = Modifier
                     .fillMaxWidth()

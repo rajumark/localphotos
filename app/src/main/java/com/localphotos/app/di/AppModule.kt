@@ -14,6 +14,7 @@ import com.localphotos.app.ui.favorites.FavoritesViewModel
 import com.localphotos.app.ui.albums.AlbumsViewModel
 import com.localphotos.app.ui.faces.FaceGridViewModel
 import com.localphotos.app.ui.labels.LabelsViewModel
+import com.localphotos.app.ui.dbinfo.DbInfoViewModel
 import android.app.Application
 import android.content.Context
 import com.localphotos.app.ui.main.MainViewModel
@@ -59,4 +60,5 @@ val appModule = module {
     viewModel { LabelsViewModel(get()) }
     viewModel { AlbumsViewModel(get()) }
     viewModel { FaceGridViewModel(get(), get()) }
+    viewModel { DbInfoViewModel(get()) }
 }

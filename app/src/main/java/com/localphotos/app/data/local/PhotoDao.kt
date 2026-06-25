@@ -130,7 +130,29 @@ interface PhotoDao {
     """)
     suspend fun getRemainingPhaseCount(): Int
 
+    @Query("SELECT COUNT(*) FROM photos")
+    fun getTotalPhotoCountFlow(): Flow<Int>
 
+    @Query("SELECT COUNT(*) FROM photos WHERE isTextProcessed = 1")
+    fun getTextProcessedCount(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM photos WHERE isLabelProcessed = 1")
+    fun getLabelProcessedCount(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM photos WHERE isFaceProcessed = 1")
+    fun getFaceProcessedCount(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM photos WHERE isTextProcessed = 1 AND isLabelProcessed = 1 AND isFaceProcessed = 1")
+    fun getFullyProcessedCount(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM photo_labels")
+    fun getTotalLabelAssignments(): Flow<Int>
+
+    @Query("SELECT COUNT(DISTINCT label) FROM photo_labels")
+    fun getDistinctLabelCount(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM faces")
+    fun getTotalFacesFound(): Flow<Int>
 
     @Query("SELECT COUNT(*) FROM photos WHERE isTextProcessed = 1 AND isLabelProcessed = 0")
     fun getLabelPendingCount(): Flow<Int>

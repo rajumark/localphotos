@@ -7,6 +7,7 @@ import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.filled.PhotoAlbum
 import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -29,6 +30,7 @@ sealed class Screen(val route: String) {
         fun createRoute(label: String) =
             "label_detail/${java.net.URLEncoder.encode(label, "UTF-8")}"
     }
+    data object DbInfo : Screen("dbinfo")
 }
 
 data class BottomNavItem(
@@ -63,5 +65,6 @@ val categoryItems = listOf(
     CategoryItem("Albums", Screen.Albums.route, Icons.Filled.PhotoAlbum),
     CategoryItem("Faces", Screen.Faces.route, Icons.Filled.Face),
     CategoryItem("Documents", Screen.LabelDetail.createRoute("Paper"), Icons.Filled.Description),
-    CategoryItem("Labels", Screen.Labels.route, Icons.AutoMirrored.Filled.Label)
+    CategoryItem("Labels", Screen.Labels.route, Icons.AutoMirrored.Filled.Label),
+    CategoryItem("DB Info", Screen.DbInfo.route, Icons.Filled.Storage)
 )

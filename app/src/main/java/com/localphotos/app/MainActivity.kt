@@ -2,7 +2,6 @@ package com.localphotos.app
 
 import android.Manifest
 import android.content.Context
-import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -24,6 +23,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.PermissionChecker
+import android.os.Build
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -42,6 +42,7 @@ import com.localphotos.app.ui.faces.FaceGridScreen
 import com.localphotos.app.ui.labels.LabelDetailScreen
 import com.localphotos.app.ui.labels.LabelsScreen
 import com.localphotos.app.ui.main.MainScreen
+import com.localphotos.app.ui.dbinfo.DbInfoScreen
 import com.localphotos.app.ui.permission.PermissionScreen
 import com.localphotos.app.ui.theme.LocalPhotosTheme
 import java.net.URLDecoder
@@ -128,9 +129,13 @@ fun AppNavigation() {
                 })
             }
             composable(Screen.Category.route) {
-                CategoryScreen(onTileClick = { route ->
-                    navController.navigate(route)
-                })
+                val isDbInfoDevice = Build.MODEL == "moto g57 power"
+                CategoryScreen(
+                    showDbInfo = isDbInfoDevice,
+                    onTileClick = { route ->
+                        navController.navigate(route)
+                    }
+                )
             }
             composable(Screen.Albums.route) {
                 AlbumsScreen(
@@ -155,6 +160,9 @@ fun AppNavigation() {
                         navController.navigate(Screen.LabelDetail.createRoute(label))
                     }
                 )
+            }
+            composable(Screen.DbInfo.route) {
+                DbInfoScreen(onBack = { navController.popBackStack() })
             }
             composable(
                 route = Screen.LabelDetail.route,

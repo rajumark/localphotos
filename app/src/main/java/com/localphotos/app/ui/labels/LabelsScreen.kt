@@ -58,7 +58,7 @@ fun LabelsScreen(
     onLabelClick: (String) -> Unit = {},
     viewModel: LabelsViewModel = koinViewModel()
 ) {
-    val labels by viewModel.labels.collectAsState(initial = null)
+    val labels by viewModel.labels.collectAsState(initial = emptyList())
     val searchQuery by viewModel.searchQuery.collectAsState()
     var showSearch by remember { mutableStateOf(false) }
 
@@ -97,14 +97,7 @@ fun LabelsScreen(
                 )
             }
 
-            if (labels == null) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
-                }
-            } else if (labels!!.isEmpty()) {
+            if (labels.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center

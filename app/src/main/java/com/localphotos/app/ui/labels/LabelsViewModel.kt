@@ -17,12 +17,12 @@ class LabelsViewModel(
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    val labels: Flow<List<LabelWithPhotos>?> = combine(
+    val labels: Flow<List<LabelWithPhotos>> = combine(
         repository.getLabelWithPhotos(), _searchQuery
     ) { allLabels, query ->
         if (query.isBlank()) allLabels
         else allLabels.filter { it.label.contains(query, ignoreCase = true) }
-    }.map { it.ifEmpty { null } }
+    }
 
     fun onSearchQueryChange(query: String) {
         _searchQuery.value = query
