@@ -263,6 +263,56 @@ class PhotoRepositoryImpl(
         return photoDao.getFavoritePhotosByBucketPaged(bucketId)
     }
 
+    override suspend fun getAllPhotoUris(): List<String> = photoDao.getAllUrisOrdered()
+
+    override suspend fun getPhotoDetails(context: Context, uri: String): PhotoRepository.PhotoDetails {
+        val queryUri = Uri.parse(uri)
+        val projection = arrayOf(
+            MediaStore.Images.Media.DISPLAY_NAME,
+            MediaStore.Images.Media.DATE_ADDED,
+            MediaStore.Images.Media.DATE_MODIFIED,
+            MediaStore.Images.Media.MIME_TYPE,
+            MediaStore.Images.Media.SIZE,
+            MediaStore.Images.Media.WIDTH,
+            MediaStore.Images.Media.HEIGHT,
+            MediaStore.Images.Media.BUCKET_DISPLAY_NAME
+        )
+        var details: PhotoRepository.PhotoDetails? = null
+        val cursor = context.contentResolver.query(queryUri, projection, null, null, null)
+        cursor?.use {
+            if (it.moveToFirst()) {
+                val name = it.getString(it.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME))
+                val dateAdded = it.getLong(it.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED))
+                val dateModified = it.getLong(it.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_MODIFIED))
+                val mime = it.getString(it.getColumnIndexOrThrow(MediaStore.Images.Media.MIME_TYPE))
+                val size = it.getLong(it.getColumnIndexOrThrow(MediaStore.Images.Media.SIZE))
+                val width = it.getInt(it.getColumnIndexOrThrow(MediaStore.Images.Media.WIDTH))
+                val height = it.getInt(it.getColumnIndexOrThrow(MediaStore.Images.Media.HEIGHT))
+                val bucket = it.getString(it.getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_DISPLAY_NAME))
+                val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault())
+                details = PhotoRepository.PhotoDetails(
+                    displayName = name,
+                    dateAdded = sdf.format(java.util.Date(dateAdded * 1000L)),
+                    dateModified = sdf.format(java.util.Date(dateModified * 1000L)),
+                    mimeType = mime,
+                    fileSize = if (size > 0) {
+                        if (size < 1024) "$size B"
+                        else if (size < 1024 * 1024) "${size / 1024} KB"
+                        else "%.1f MB".format(size.toDouble() / (1024 * 1024))
+                    } else null,
+                    resolution = if (width > 0 && height > 0) "${width}x${height}" else null,
+                    bucketDisplayName = bucket,
+                    uri = uri
+                )
+            }
+        }
+        return details ?: PhotoRepository.PhotoDetails(
+            displayName = null, dateAdded = null, dateModified = null,
+            mimeType = null, fileSize = null, resolution = null,
+            bucketDisplayName = null, uri = uri
+        )
+    }
+
     private fun getPhotoDisplayName(uri: Uri): String? {
         val cursor = context.contentResolver.query(
             uri,

@@ -86,6 +86,9 @@ interface PhotoDao {
     @Query("SELECT uri FROM photos")
     suspend fun getAllUris(): List<String>
 
+    @Query("SELECT uri FROM photos ORDER BY dateAdded DESC")
+    suspend fun getAllUrisOrdered(): List<String>
+
     @Query("UPDATE photos SET isFavorite = :isFavorite WHERE uri = :uri")
     suspend fun setFavorite(uri: String, isFavorite: Boolean)
 

@@ -1,5 +1,6 @@
 package com.localphotos.app.data.repository
 
+import android.content.Context
 import androidx.paging.PagingData
 import androidx.paging.PagingSource
 import com.localphotos.app.data.local.entities.AlbumInfo
@@ -27,4 +28,16 @@ interface PhotoRepository {
     fun getAlbums(): Flow<List<AlbumInfo>>
     fun getPhotosByBucketPaged(bucketId: String): Flow<PagingData<PhotoListItem>>
     fun getFavoritePhotosByBucketPaged(bucketId: String): PagingSource<Int, PhotoEntity>
+    suspend fun getAllPhotoUris(): List<String>
+    data class PhotoDetails(
+        val displayName: String?,
+        val dateAdded: String?,
+        val dateModified: String?,
+        val mimeType: String?,
+        val fileSize: String?,
+        val resolution: String?,
+        val bucketDisplayName: String?,
+        val uri: String
+    )
+    suspend fun getPhotoDetails(context: Context, uri: String): PhotoDetails
 }

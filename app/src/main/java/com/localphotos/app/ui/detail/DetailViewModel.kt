@@ -1,5 +1,6 @@
 package com.localphotos.app.ui.detail
 
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -19,9 +20,28 @@ class DetailViewModel(
     private val _photo = MutableStateFlow<PhotoEntity?>(null)
     val photo: StateFlow<PhotoEntity?> = _photo.asStateFlow()
 
+    private val _allUris = MutableStateFlow<List<String>>(emptyList())
+    val allUris: StateFlow<List<String>> = _allUris.asStateFlow()
+
+    private val _photoDetails = MutableStateFlow<PhotoRepository.PhotoDetails?>(null)
+    val photoDetails: StateFlow<PhotoRepository.PhotoDetails?> = _photoDetails.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            _allUris.value = repository.getAllPhotoUris()
+        }
+    }
+
     fun loadPhoto(uri: String) {
         viewModelScope.launch {
             _photo.value = repository.getPhotoByUri(uri)
+        }
+    }
+
+    fun loadDetails(context: Context) {
+        val current = _photo.value ?: return
+        viewModelScope.launch {
+            _photoDetails.value = repository.getPhotoDetails(context, current.uri)
         }
     }
 
@@ -49,5 +69,22 @@ class DetailViewModel(
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         context.startActivity(Intent.createChooser(shareIntent, "Share photo"))
+    }
+
+    fun openInLens(context: Context) {
+        val p = _photo.value ?: return
+        try {
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                data = Uri.parse(p.uri)
+                `package` = "com.google.ar.lens"
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.startActivity(intent)
+        } catch (_: ActivityNotFoundException) {
+            try {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=com.google.ar.lens"))
+                context.startActivity(intent)
+            } catch (_: ActivityNotFoundException) {}
+        }
     }
 }

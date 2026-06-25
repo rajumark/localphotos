@@ -141,13 +141,9 @@ fun MainScreen(
         }
 
         if (isProcessing) {
-            val status = when {
-                pendingCount > 0 -> "OCR: $pendingCount remaining"
-                labelPendingCount > 0 -> "Labeling: $labelPendingCount remaining"
-                else -> "Processing\u2026"
-            }
+            val total = pendingCount + labelPendingCount
             Text(
-                text = status,
+                text = "${total} scanning\u2026",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier
