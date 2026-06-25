@@ -1,18 +1,21 @@
 package com.localphotos.app.ui.main
 
+import android.app.Application
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.content.SharedPreferences
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
 import com.localphotos.app.data.local.entities.PhotoListItem
 import com.localphotos.app.data.repository.PhotoRepository
 import com.localphotos.app.ui.components.FilterMode
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
+import com.localphotos.app.worker.ProcessingWorker
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,24 +28,25 @@ import kotlinx.coroutines.FlowPreview
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class, FlowPreview::class)
 class MainViewModel(
+    application: Application,
     private val repository: PhotoRepository,
     private val prefs: SharedPreferences,
     private val filter: GalleryFilter? = null
-) : ViewModel() {
+) : AndroidViewModel(application) {
     private val bucketId: String? get() = filter?.bucketId
     private val label: String? get() = filter?.label
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    private val _pendingCount = MutableStateFlow(0)
-    val pendingCount: StateFlow<Int> = _pendingCount.asStateFlow()
+    private val _totalPhotoCount = MutableStateFlow(0)
+    val totalPhotoCount: StateFlow<Int> = _totalPhotoCount.asStateFlow()
 
-    private val _labelPendingCount = MutableStateFlow(0)
-    val labelPendingCount: StateFlow<Int> = _labelPendingCount.asStateFlow()
+    private val _parsedCount = MutableStateFlow(0)
+    val parsedCount: StateFlow<Int> = _parsedCount.asStateFlow()
 
-    private val _facePendingCount = MutableStateFlow(0)
-    val facePendingCount: StateFlow<Int> = _facePendingCount.asStateFlow()
+    private val _processingChip = MutableStateFlow<String?>(null)
+    val processingChip: StateFlow<String?> = _processingChip.asStateFlow()
 
     private val _isProcessing = MutableStateFlow(false)
     val isProcessing: StateFlow<Boolean> = _isProcessing.asStateFlow()
@@ -52,8 +56,6 @@ class MainViewModel(
 
     private val _filterMode = MutableStateFlow(FilterMode.ALL)
     val filterMode: StateFlow<FilterMode> = _filterMode.asStateFlow()
-
-    val totalFacePendingCount: StateFlow<Int> = _facePendingCount.asStateFlow()
 
     private val _selectedUris = MutableStateFlow<Set<String>>(emptySet())
     val selectedUris: StateFlow<Set<String>> = _selectedUris.asStateFlow()
@@ -78,35 +80,42 @@ class MainViewModel(
         }
         .cachedIn(viewModelScope)
 
-    private var processingJob: Job? = null
-
     init {
         viewModelScope.launch {
-            repository.getPendingCount().collect { count ->
-                _pendingCount.value = count
-                if (count > 0 && processingJob == null) {
-                    startProcessing()
-                }
-            }
+            _totalPhotoCount.value = repository.getTotalPhotoCount()
         }
         viewModelScope.launch {
-            repository.getLabelPendingCount().collect { count ->
-                _labelPendingCount.value = count
-                if (_pendingCount.value == 0 && count > 0 && processingJob == null) {
-                    startProcessing()
+            var lastParsed = 0
+            var lastTime = 0L
+            combine(
+                repository.getPendingCount(),
+                repository.getLabelPendingCount(),
+                repository.getFacePendingCount()
+            ) { ocr, label, face -> ocr + label + face }
+                .collect { unprocessed ->
+                    val total = _totalPhotoCount.value
+                    val parsed = (total - unprocessed).coerceAtLeast(0)
+                    _isProcessing.value = unprocessed > 0
+                    _parsedCount.value = parsed
+
+                    if (unprocessed > 0) {
+                        val now = System.currentTimeMillis()
+                        if (parsed > lastParsed && lastParsed > 0) {
+                            val phaseTime = (now - lastTime) / (parsed - lastParsed)
+                            val etaMin = ((phaseTime * unprocessed) / 60000).toInt().coerceAtLeast(1)
+                            _processingChip.value = "$parsed : ~${etaMin}m"
+                        } else if (parsed > 0) {
+                            _processingChip.value = "$parsed : ~?m"
+                        } else {
+                            _processingChip.value = "0"
+                        }
+                        lastParsed = parsed
+                        lastTime = now
+                    } else {
+                        _processingChip.value = null
+                        lastParsed = 0
+                    }
                 }
-            }
-        }
-        viewModelScope.launch {
-            repository.getFacePendingCount().collect { count ->
-                _facePendingCount.value = count
-                if (_pendingCount.value == 0 && _labelPendingCount.value == 0 && count > 0 && processingJob == null) {
-                    startProcessing()
-                }
-            }
-        }
-        viewModelScope.launch {
-            refreshAndProcess()
         }
     }
 
@@ -163,45 +172,17 @@ class MainViewModel(
 
     fun onResume() {
         viewModelScope.launch {
-            refreshAndProcess()
+            repository.refreshPhotos()
+            val pending = repository.getTotalUnprocessedCount()
+            if (pending == 0) return@launch
+
+            val work = OneTimeWorkRequestBuilder<ProcessingWorker>()
+                .build()
+            WorkManager.getInstance(getApplication()).enqueueUniqueWork(
+                "photo_processing",
+                ExistingWorkPolicy.KEEP,
+                work
+            )
         }
-    }
-
-    private suspend fun refreshAndProcess() {
-        repository.refreshPhotos()
-        startProcessing()
-    }
-
-    private fun startProcessing() {
-        processingJob?.cancel()
-        processingJob = viewModelScope.launch {
-            _isProcessing.value = true
-            try {
-                while (true) {
-                    val hasMore = repository.processOne()
-                    if (!hasMore) break
-                    delay(100)
-                }
-                while (true) {
-                    val hasMore = repository.processOneLabel()
-                    if (!hasMore) break
-                    delay(100)
-                }
-                while (true) {
-                    val hasMore = repository.processOneFace()
-                    if (!hasMore) break
-                    delay(100)
-                }
-            } catch (_: Exception) {
-            } finally {
-                _isProcessing.value = false
-                processingJob = null
-            }
-        }
-    }
-
-    override fun onCleared() {
-        processingJob?.cancel()
-        super.onCleared()
     }
 }

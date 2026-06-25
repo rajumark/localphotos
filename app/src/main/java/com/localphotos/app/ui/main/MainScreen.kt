@@ -10,11 +10,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -22,7 +20,6 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.CheckCircle
@@ -42,6 +39,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -84,9 +82,6 @@ fun MainScreen(
     }
 ) {
     val searchQuery by viewModel.searchQuery.collectAsState()
-    val pendingCount by viewModel.pendingCount.collectAsState()
-    val labelPendingCount by viewModel.labelPendingCount.collectAsState()
-    val facePendingCount by viewModel.facePendingCount.collectAsState()
     val isProcessing by viewModel.isProcessing.collectAsState()
     val isGridView by viewModel.isGridView.collectAsState()
     val filterMode by viewModel.filterMode.collectAsState()
@@ -96,6 +91,10 @@ fun MainScreen(
 
     val currentItems = viewModel.photos.collectAsLazyPagingItems()
     val listState = rememberLazyListState()
+
+    LaunchedEffect(Unit) {
+        viewModel.onResume()
+    }
 
     BackHandler(enabled = selectedUris.isNotEmpty()) {
         viewModel.clearSelection()
@@ -146,22 +145,6 @@ fun MainScreen(
                 onToggleViewMode = viewModel::toggleViewMode,
                 title = title,
                 onBack = if (viewModel.isAlbum || viewModel.isLabelFilter) onBack else null
-            )
-        }
-
-        if (isProcessing) {
-            val parts = mutableListOf<String>()
-            if (pendingCount > 0) parts.add("OCR: $pendingCount")
-            if (labelPendingCount > 0) parts.add("Labels: $labelPendingCount")
-            if (facePendingCount > 0) parts.add("Faces: $facePendingCount")
-            val text = if (parts.isNotEmpty()) parts.joinToString("  ") else "scanning\u2026"
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 2.dp)
             )
         }
 

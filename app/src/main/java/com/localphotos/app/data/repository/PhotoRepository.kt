@@ -26,6 +26,10 @@ interface PhotoRepository {
     suspend fun processOne(): Boolean
     suspend fun processOneLabel(): Boolean
     suspend fun processOneFace(): Boolean
+    suspend fun processNextPhoto(): Boolean
+    suspend fun getTotalPhotoCount(): Int
+    suspend fun getTotalUnprocessedCount(): Int
+    suspend fun getRemainingPhaseCount(): Int
     fun getFacePendingCount(): Flow<Int>
     fun getFacePhotosPaged(filter: FaceCountFilter): Flow<PagingData<PhotoEntity>>
     fun getAllLabelsWithCount(): Flow<List<LabelWithCount>>

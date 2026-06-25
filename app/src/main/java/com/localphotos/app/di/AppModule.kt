@@ -14,6 +14,7 @@ import com.localphotos.app.ui.favorites.FavoritesViewModel
 import com.localphotos.app.ui.albums.AlbumsViewModel
 import com.localphotos.app.ui.faces.FaceGridViewModel
 import com.localphotos.app.ui.labels.LabelsViewModel
+import android.app.Application
 import android.content.Context
 import com.localphotos.app.ui.main.MainViewModel
 import org.koin.android.ext.koin.androidContext
@@ -52,7 +53,7 @@ val appModule = module {
 
     single { androidContext().getSharedPreferences("local_photos_prefs", Context.MODE_PRIVATE) }
 
-    viewModel { params -> MainViewModel(get(), get(), params.getOrNull()) }
+    viewModel { params -> MainViewModel(androidContext() as Application, get(), get(), params.getOrNull()) }
     viewModel { DetailViewModel(get()) }
     viewModel { FavoritesViewModel(get()) }
     viewModel { LabelsViewModel(get()) }

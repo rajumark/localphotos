@@ -115,6 +115,23 @@ interface PhotoDao {
     @Query("SELECT * FROM photos WHERE isTextProcessed = 1 AND isLabelProcessed = 0 ORDER BY dateAdded DESC LIMIT 1")
     suspend fun getNextUnlabeled(): PhotoEntity?
 
+    @Query("SELECT COUNT(*) FROM photos")
+    suspend fun getTotalPhotoCount(): Int
+
+    @Query("SELECT COUNT(*) FROM photos WHERE NOT (isTextProcessed = 1 AND isLabelProcessed = 1 AND isFaceProcessed = 1)")
+    suspend fun getTotalUnprocessedCount(): Int
+
+    @Query("""
+        SELECT IFNULL(SUM(
+            CASE WHEN isTextProcessed = 0 THEN 1 ELSE 0 END +
+            CASE WHEN isLabelProcessed = 0 THEN 1 ELSE 0 END +
+            CASE WHEN isFaceProcessed = 0 THEN 1 ELSE 0 END
+        ), 0) FROM photos
+    """)
+    suspend fun getRemainingPhaseCount(): Int
+
+
+
     @Query("SELECT COUNT(*) FROM photos WHERE isTextProcessed = 1 AND isLabelProcessed = 0")
     fun getLabelPendingCount(): Flow<Int>
 

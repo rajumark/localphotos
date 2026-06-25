@@ -225,6 +225,19 @@ class PhotoRepositoryImpl(
         true
     }
 
+    override suspend fun getTotalPhotoCount(): Int = photoDao.getTotalPhotoCount()
+
+    override suspend fun getTotalUnprocessedCount(): Int = photoDao.getTotalUnprocessedCount()
+
+    override suspend fun getRemainingPhaseCount(): Int = photoDao.getRemainingPhaseCount()
+
+    override suspend fun processNextPhoto(): Boolean = withContext(Dispatchers.IO) {
+        if (processOne()) return@withContext true
+        if (processOneLabel()) return@withContext true
+        if (processOneFace()) return@withContext true
+        false
+    }
+
     override fun getFacePendingCount(): Flow<Int> = photoDao.getFacePendingCount()
 
     override suspend fun processOneFace(): Boolean = withContext(Dispatchers.IO) {

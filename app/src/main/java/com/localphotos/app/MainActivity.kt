@@ -1,19 +1,15 @@
 package com.localphotos.app
 
 import android.Manifest
+import android.content.Context
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -22,10 +18,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import androidx.core.content.PermissionChecker
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -45,44 +42,25 @@ import com.localphotos.app.ui.faces.FaceGridScreen
 import com.localphotos.app.ui.labels.LabelDetailScreen
 import com.localphotos.app.ui.labels.LabelsScreen
 import com.localphotos.app.ui.main.MainScreen
+import com.localphotos.app.ui.permission.PermissionScreen
 import com.localphotos.app.ui.theme.LocalPhotosTheme
 import java.net.URLDecoder
 
 class MainActivity : ComponentActivity() {
-    private var permissionGranted = false
-
-    private val permissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        permissionGranted = granted
-        if (granted) {
-            recreate()
-        }
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            Manifest.permission.READ_MEDIA_IMAGES
-        } else {
-            Manifest.permission.READ_EXTERNAL_STORAGE
-        }
-        permissionGranted = PermissionChecker.checkSelfPermission(this, permission) == PermissionChecker.PERMISSION_GRANTED
-        if (!permissionGranted) {
-            permissionLauncher.launch(permission)
-        }
-
         setContent {
+            val context = LocalContext.current
+            var allGranted by remember { mutableStateOf(areAllPermissionsGranted(context)) }
+
             LocalPhotosTheme {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    if (!permissionGranted) {
-                        PermissionDeniedScreen(onRetry = {
-                            permissionLauncher.launch(permission)
-                        })
-                    } else {
+                    if (allGranted) {
                         AppNavigation()
+                    } else {
+                        PermissionScreen(onAllGranted = { allGranted = true })
                     }
                 }
             }
@@ -90,22 +68,16 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@Composable
-fun PermissionDeniedScreen(onRetry: () -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = "Storage permission needed to scan photos",
-            style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.padding(16.dp)
-        )
-        Button(onClick = onRetry, modifier = Modifier.padding(16.dp)) {
-            Text("Grant Permission")
-        }
+private fun areAllPermissionsGranted(context: Context): Boolean {
+    val storagePermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        Manifest.permission.READ_MEDIA_IMAGES
+    } else {
+        Manifest.permission.READ_EXTERNAL_STORAGE
     }
+    val storageOk = PermissionChecker.checkSelfPermission(context, storagePermission) == PermissionChecker.PERMISSION_GRANTED
+    val notificationOk = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+        PermissionChecker.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PermissionChecker.PERMISSION_GRANTED
+    return storageOk && notificationOk
 }
 
 @Composable
