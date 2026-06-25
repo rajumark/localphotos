@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -20,7 +21,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,15 +35,17 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.localphotos.app.data.repository.PhotoRepository
 import com.localphotos.app.navigation.Screen
 import com.localphotos.app.navigation.bottomNavItems
+import com.localphotos.app.ui.albums.AlbumsScreen
+import com.localphotos.app.ui.category.CategoryScreen
 import com.localphotos.app.ui.detail.DetailScreen
-import com.localphotos.app.ui.favorites.FavoritesScreen
+import com.localphotos.app.ui.documents.DocumentsScreen
+import com.localphotos.app.ui.faces.FacesScreen
+import com.localphotos.app.ui.labels.LabelsScreen
 import com.localphotos.app.ui.main.MainScreen
 import com.localphotos.app.ui.theme.LocalPhotosTheme
 import java.net.URLDecoder
-import org.koin.java.KoinJavaComponent.get
 
 class MainActivity : ComponentActivity() {
     private var permissionGranted = false
@@ -110,9 +112,7 @@ fun AppNavigation() {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
-    val repository = get<PhotoRepository>(PhotoRepository::class.java)
-    val favoriteCount by repository.favoriteCount.collectAsState(initial = 0)
-    val showBottomBar = currentDestination?.route in bottomNavItems.map { it.route } && favoriteCount > 0
+    val showBottomBar = currentDestination?.route in bottomNavItems.map { it.route }
 
     Scaffold(
         bottomBar = {
@@ -154,10 +154,22 @@ fun AppNavigation() {
                     navController.navigate(Screen.Detail.createRoute(uri))
                 })
             }
-            composable(Screen.Favorites.route) {
-                FavoritesScreen(onPhotoClick = { uri ->
-                    navController.navigate(Screen.Detail.createRoute(uri))
+            composable(Screen.Category.route) {
+                CategoryScreen(onTileClick = { route ->
+                    navController.navigate(route)
                 })
+            }
+            composable(Screen.Albums.route) {
+                AlbumsScreen(onBack = { navController.popBackStack() })
+            }
+            composable(Screen.Faces.route) {
+                FacesScreen(onBack = { navController.popBackStack() })
+            }
+            composable(Screen.Documents.route) {
+                DocumentsScreen(onBack = { navController.popBackStack() })
+            }
+            composable(Screen.Labels.route) {
+                LabelsScreen(onBack = { navController.popBackStack() })
             }
             composable(
                 route = Screen.Detail.route,

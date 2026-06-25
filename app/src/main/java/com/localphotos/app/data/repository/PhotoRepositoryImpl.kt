@@ -11,6 +11,7 @@ import androidx.paging.PagingState
 import androidx.paging.insertSeparators
 import androidx.paging.map
 import com.localphotos.app.data.local.PhotoDao
+import com.localphotos.app.data.local.entities.DeletedUriEntity
 import com.localphotos.app.data.local.entities.PhotoEntity
 import com.localphotos.app.data.local.entities.PhotoFtsEntity
 import com.localphotos.app.data.local.entities.PhotoListItem
@@ -86,6 +87,7 @@ class PhotoRepositoryImpl(
     }
 
     override suspend fun deletePhoto(uri: String) {
+        photoDao.insertDeletedUri(DeletedUriEntity(uri))
         photoDao.deleteFts(uri)
         photoDao.deletePhoto(uri)
     }
@@ -95,13 +97,15 @@ class PhotoRepositoryImpl(
         val deviceUris = devicePhotos.map { it.first }.toSet()
         val deviceUriMap = devicePhotos.associate { it.first to it.second }
         val dbUris = photoDao.getAllUris().toSet()
+        val manuallyDeletedUris = photoDao.getAllDeletedUris().toSet()
 
-        val newUris = deviceUris - dbUris
+        val newUris = deviceUris - dbUris - manuallyDeletedUris
         val deletedUris = dbUris - deviceUris
 
         if (deletedUris.isNotEmpty()) {
             photoDao.deleteFtsNotIn(deviceUris.toList())
             photoDao.deletePhotosNotIn(deviceUris.toList())
+            photoDao.deleteDeletedUrisNotIn(deviceUris.toList())
         }
 
         if (newUris.isNotEmpty()) {
@@ -114,10 +118,26 @@ class PhotoRepositoryImpl(
 
     override suspend fun processOne(): Boolean = withContext(Dispatchers.IO) {
         val photo = photoDao.getNextUnprocessed() ?: return@withContext false
-        val text = ocrProcessor.extractTextFromUri(Uri.parse(photo.uri))
-        photoDao.markProcessed(photo.uri, text)
-        photoDao.insertFts(PhotoFtsEntity(uri = photo.uri, text = text))
+        val uri = Uri.parse(photo.uri)
+        val filename = getPhotoDisplayName(uri)
+        val text = ocrProcessor.extractTextFromUri(uri)
+        val augmentedText = if (filename != null) "$filename $text" else text
+        photoDao.markProcessed(photo.uri, augmentedText)
+        photoDao.insertFts(PhotoFtsEntity(uri = photo.uri, text = augmentedText))
         true
+    }
+
+    private fun getPhotoDisplayName(uri: Uri): String? {
+        val cursor = context.contentResolver.query(
+            uri,
+            arrayOf(MediaStore.Images.Media.DISPLAY_NAME),
+            null,
+            null,
+            null
+        )
+        return cursor?.use {
+            if (it.moveToFirst()) it.getString(0) else null
+        }
     }
 
     private fun getDevicePhotosWithDate(): List<Pair<String, Long>> {

@@ -1,15 +1,23 @@
 package com.localphotos.app.navigation
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Face
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.automirrored.filled.Label
+import androidx.compose.material.icons.filled.PhotoAlbum
 import androidx.compose.material.icons.filled.PhotoLibrary
-import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.ui.graphics.vector.ImageVector
 
 sealed class Screen(val route: String) {
     data object Main : Screen("main")
-    data object Favorites : Screen("favorites")
+    data object Category : Screen("category")
+    data object Albums : Screen("albums")
+    data object Faces : Screen("faces")
+    data object Documents : Screen("documents")
+    data object Labels : Screen("labels")
     data object Detail : Screen("detail/{uri}") {
         fun createRoute(uri: String) = "detail/${java.net.URLEncoder.encode(uri, "UTF-8")}"
     }
@@ -30,9 +38,22 @@ val bottomNavItems = listOf(
         unselectedIcon = Icons.Outlined.PhotoLibrary
     ),
     BottomNavItem(
-        label = "Favorites",
-        route = Screen.Favorites.route,
-        selectedIcon = Icons.Filled.Favorite,
-        unselectedIcon = Icons.Outlined.FavoriteBorder
+        label = "Category",
+        route = Screen.Category.route,
+        selectedIcon = Icons.Filled.GridView,
+        unselectedIcon = Icons.Outlined.GridView
     )
+)
+
+data class CategoryItem(
+    val label: String,
+    val route: String,
+    val icon: ImageVector
+)
+
+val categoryItems = listOf(
+    CategoryItem("Albums", Screen.Albums.route, Icons.Filled.PhotoAlbum),
+    CategoryItem("Faces", Screen.Faces.route, Icons.Filled.Face),
+    CategoryItem("Documents", Screen.Documents.route, Icons.Filled.Description),
+    CategoryItem("Labels", Screen.Labels.route, Icons.AutoMirrored.Filled.Label)
 )

@@ -11,8 +11,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -33,11 +35,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -76,81 +75,73 @@ fun DetailScreen(
         viewModel.loadPhoto(uri)
     }
 
-    Scaffold(
-        modifier = modifier,
-        topBar = {
-            TopAppBar(
-                title = { },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Black.copy(alpha = 0.8f),
-                    navigationIconContentColor = Color.White,
-                    actionIconContentColor = Color.White
-                )
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Color.Black)
+    ) {
+        if (photo != null) {
+            AsyncImage(
+                model = photo!!.uri,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit
             )
-        },
-        containerColor = Color.Black
-    ) { padding ->
+        }
+
         Box(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-            contentAlignment = Alignment.Center
+                .fillMaxWidth()
+                .align(Alignment.TopCenter)
+                .background(Color.Black.copy(alpha = 0.8f))
+                .statusBarsPadding()
         ) {
-            if (photo != null) {
-                AsyncImage(
-                    model = photo!!.uri,
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Fit
-                )
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
             }
+        }
 
-            Row(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .background(Color.Black.copy(alpha = 0.7f))
-                    .padding(horizontal = 24.dp, vertical = 16.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+        Row(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .background(Color.Black.copy(alpha = 0.7f))
+                .navigationBarsPadding()
+                .padding(horizontal = 24.dp, vertical = 16.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            ActionItem(
+                icon = { Icon(Icons.AutoMirrored.Filled.TextSnippet, contentDescription = "Text", tint = Color.White, modifier = Modifier.size(24.dp)) },
+                label = "Text",
+                onClick = { showTextSheet = true }
+            )
+
+            ActionItem(
+                icon = { Icon(Icons.Filled.Share, contentDescription = "Share", tint = Color.White, modifier = Modifier.size(24.dp)) },
+                label = "Share",
+                onClick = { viewModel.sharePhoto(context) }
+            )
+
+            ActionItem(
+                icon = { Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = Color.White, modifier = Modifier.size(24.dp)) },
+                label = "Delete",
+                onClick = { showDeleteDialog = true }
+            )
+
+            if (photo != null) {
                 ActionItem(
-                    icon = { Icon(Icons.AutoMirrored.Filled.TextSnippet, contentDescription = "Text", tint = Color.White, modifier = Modifier.size(24.dp)) },
-                    label = "Text",
-                    onClick = { showTextSheet = true }
+                    icon = {
+                        Icon(
+                            if (photo!!.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                            contentDescription = "Favorite",
+                            tint = if (photo!!.isFavorite) Color(0xFFFF5252) else Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    },
+                    label = if (photo!!.isFavorite) "Favorited" else "Favorite",
+                    onClick = { viewModel.toggleFavorite() }
                 )
-
-                ActionItem(
-                    icon = { Icon(Icons.Filled.Share, contentDescription = "Share", tint = Color.White, modifier = Modifier.size(24.dp)) },
-                    label = "Share",
-                    onClick = { viewModel.sharePhoto(context) }
-                )
-
-                ActionItem(
-                    icon = { Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = Color.White, modifier = Modifier.size(24.dp)) },
-                    label = "Delete",
-                    onClick = { showDeleteDialog = true }
-                )
-
-                if (photo != null) {
-                    ActionItem(
-                        icon = {
-                            Icon(
-                                if (photo!!.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                                contentDescription = "Favorite",
-                                tint = if (photo!!.isFavorite) Color(0xFFFF5252) else Color.White,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        },
-                        label = if (photo!!.isFavorite) "Favorited" else "Favorite",
-                        onClick = { viewModel.toggleFavorite() }
-                    )
-                }
             }
         }
     }

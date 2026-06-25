@@ -9,6 +9,7 @@ import androidx.room.RawQuery
 import androidx.room.Update
 import androidx.sqlite.db.SimpleSQLiteQuery
 import androidx.sqlite.db.SupportSQLiteQuery
+import com.localphotos.app.data.local.entities.DeletedUriEntity
 import com.localphotos.app.data.local.entities.PhotoEntity
 import com.localphotos.app.data.local.entities.PhotoFtsEntity
 import kotlinx.coroutines.flow.Flow
@@ -24,6 +25,18 @@ interface PhotoDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertFts(fts: PhotoFtsEntity)
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertDeletedUri(deletedUri: DeletedUriEntity)
+
+    @Query("SELECT uri FROM deleted_uris")
+    suspend fun getAllDeletedUris(): List<String>
+
+    @Query("DELETE FROM deleted_uris WHERE uri = :uri")
+    suspend fun deleteDeletedUri(uri: String)
+
+    @Query("DELETE FROM deleted_uris WHERE uri NOT IN (:uris)")
+    suspend fun deleteDeletedUrisNotIn(uris: List<String>)
 
     @Update
     suspend fun updatePhoto(photo: PhotoEntity)

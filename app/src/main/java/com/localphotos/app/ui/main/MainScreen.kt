@@ -3,15 +3,18 @@ package com.localphotos.app.ui.main
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,6 +22,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.CheckCircle
@@ -31,6 +35,8 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -51,7 +57,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.clickable
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
 import coil.compose.AsyncImage
@@ -71,6 +76,7 @@ fun MainScreen(
     val pendingCount by viewModel.pendingCount.collectAsState()
     val isProcessing by viewModel.isProcessing.collectAsState()
     val isGridView by viewModel.isGridView.collectAsState()
+    val showFavorites by viewModel.showFavorites.collectAsState()
     val selectedUris by viewModel.selectedUris.collectAsState()
     val context = LocalContext.current
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -140,6 +146,32 @@ fun MainScreen(
             }
         }
 
+        if (selectedUris.isEmpty()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilterChip(
+                    selected = !showFavorites,
+                    onClick = { viewModel.setShowFavorites(false) },
+                    label = { Text("Photos") },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer
+                    )
+                )
+                FilterChip(
+                    selected = showFavorites,
+                    onClick = { viewModel.setShowFavorites(true) },
+                    label = { Text("Favorites") },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer
+                    )
+                )
+            }
+        }
+
         if (pendingCount > 0 && isProcessing) {
             Text(
                 text = "Processing: $pendingCount remaining",
@@ -151,8 +183,22 @@ fun MainScreen(
             )
         }
 
+        if (searchQuery.isNotBlank() && currentItems.itemCount > 0) {
+            Text(
+                text = "${currentItems.itemCount} result${if (currentItems.itemCount != 1) "s" else ""} for \"$searchQuery\"",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 2.dp)
+            )
+        }
+
+        val isEmpty = currentItems.itemCount == 0
+        val isSearching = searchQuery.isNotBlank()
+
         when {
-            currentItems.loadState.refresh is LoadState.Loading && currentItems.itemCount == 0 -> {
+            currentItems.loadState.refresh is LoadState.Loading && isEmpty -> {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
@@ -160,7 +206,7 @@ fun MainScreen(
                     CircularProgressIndicator(modifier = Modifier.size(32.dp))
                 }
             }
-            currentItems.loadState.refresh is LoadState.Error && currentItems.itemCount == 0 -> {
+            currentItems.loadState.refresh is LoadState.Error && isEmpty -> {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
@@ -171,7 +217,18 @@ fun MainScreen(
                     )
                 }
             }
-            currentItems.itemCount == 0 -> {
+            isEmpty && isSearching -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "No results for \"$searchQuery\"",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                }
+            }
+            isEmpty -> {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
@@ -227,22 +284,35 @@ fun MainScreen(
                                             modifier = Modifier.fillMaxSize(),
                                             contentScale = ContentScale.Crop
                                         )
-                                        if (isSelected) {
+                                        if (selectedUris.isNotEmpty()) {
                                             Box(
-                                                modifier = Modifier
-                                                    .fillMaxSize()
-                                                    .background(Color.Black.copy(alpha = 0.35f))
-                                            )
-                                            Icon(
-                                                imageVector = Icons.Filled.CheckCircle,
-                                                contentDescription = "Selected",
-                                                tint = Color.White,
                                                 modifier = Modifier
                                                     .align(Alignment.TopEnd)
                                                     .padding(4.dp)
                                                     .size(22.dp)
                                                     .clip(CircleShape)
-                                            )
+                                                    .then(
+                                                        if (isSelected) Modifier.background(Color.White, CircleShape)
+                                                        else Modifier.border(2.dp, Color.White, CircleShape)
+                                                    ),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                if (isSelected) {
+                                                    Icon(
+                                                        imageVector = Icons.Filled.CheckCircle,
+                                                        contentDescription = "Selected",
+                                                        tint = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.size(22.dp)
+                                                    )
+                                                }
+                                            }
+                                            if (isSelected) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxSize()
+                                                        .background(Color.Black.copy(alpha = 0.35f))
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -310,21 +380,34 @@ fun MainScreen(
                                                         .aspectRatio(1f),
                                                     contentScale = ContentScale.Crop
                                                 )
-                                                if (isSelected) {
+                                                if (selectedUris.isNotEmpty()) {
+                                                    if (isSelected) {
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .size(100.dp)
+                                                                .aspectRatio(1f)
+                                                                .background(Color.Black.copy(alpha = 0.35f))
+                                                        )
+                                                    }
                                                     Box(
-                                                        modifier = Modifier
-                                                            .size(100.dp)
-                                                            .aspectRatio(1f)
-                                                            .background(Color.Black.copy(alpha = 0.35f))
-                                                    )
-                                                    Icon(
-                                                        imageVector = Icons.Filled.CheckCircle,
-                                                        contentDescription = "Selected",
-                                                        tint = Color.White,
                                                         modifier = Modifier
                                                             .size(22.dp)
                                                             .clip(CircleShape)
-                                                    )
+                                                            .then(
+                                                                if (isSelected) Modifier.background(Color.White, CircleShape)
+                                                                else Modifier.border(2.dp, Color.White, CircleShape)
+                                                            ),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        if (isSelected) {
+                                                            Icon(
+                                                                imageVector = Icons.Filled.CheckCircle,
+                                                                contentDescription = "Selected",
+                                                                tint = MaterialTheme.colorScheme.primary,
+                                                                modifier = Modifier.size(22.dp)
+                                                            )
+                                                        }
+                                                    }
                                                 }
                                             }
                                             Column(

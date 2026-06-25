@@ -17,10 +17,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.FlowPreview
 
-@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class, FlowPreview::class)
 class MainViewModel(
     private val repository: PhotoRepository,
     private val prefs: SharedPreferences
@@ -38,15 +40,23 @@ class MainViewModel(
     private val _isGridView = MutableStateFlow(prefs.getBoolean("is_grid_view", true))
     val isGridView: StateFlow<Boolean> = _isGridView.asStateFlow()
 
+    private val _showFavorites = MutableStateFlow(false)
+    val showFavorites: StateFlow<Boolean> = _showFavorites.asStateFlow()
+
     private val _selectedUris = MutableStateFlow<Set<String>>(emptySet())
     val selectedUris: StateFlow<Set<String>> = _selectedUris.asStateFlow()
 
     val photos: Flow<PagingData<PhotoListItem>> = combine(
-        _searchQuery, _isGridView
-    ) { query, isGrid -> query to isGrid }
-        .flatMapLatest { (query, isGrid) ->
-            if (isGrid) repository.getAllPhotosGridPaged(query, true)
-            else repository.getAllPhotosPaged(query, true)
+        _searchQuery.debounce(300), _isGridView, _showFavorites
+    ) { query, isGrid, showFav -> Triple(query, isGrid, showFav) }
+        .flatMapLatest { (query, isGrid, showFav) ->
+            if (showFav) {
+                if (isGrid) repository.getAllPhotosGridPaged(query, true)
+                else repository.getFavoritePhotosPaged(query)
+            } else {
+                if (isGrid) repository.getAllPhotosGridPaged(query, true)
+                else repository.getAllPhotosPaged(query, true)
+            }
         }
         .cachedIn(viewModelScope)
 
@@ -76,6 +86,10 @@ class MainViewModel(
         prefs.edit().putBoolean("is_grid_view", newValue).apply()
     }
 
+    fun setShowFavorites(show: Boolean) {
+        _showFavorites.value = show
+    }
+
     fun toggleSelection(uri: String) {
         val current = _selectedUris.value.toMutableSet()
         if (current.contains(uri)) current.remove(uri) else current.add(uri)
@@ -88,7 +102,8 @@ class MainViewModel(
 
     fun deleteSelected() {
         viewModelScope.launch {
-            _selectedUris.value.forEach { repository.deletePhoto(it) }
+            val uris = _selectedUris.value.toList()
+            uris.forEach { repository.deletePhoto(it) }
             _selectedUris.value = emptySet()
         }
     }
